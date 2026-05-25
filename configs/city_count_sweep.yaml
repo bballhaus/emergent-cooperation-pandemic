@@ -1,0 +1,4 @@
+# City-count sweep. Tests whether emergent-cooperation results hold as N grows.
+base: env_default.yaml
+sweep_key: n_cities
+sweep_values: [2, 4, 6, 8]

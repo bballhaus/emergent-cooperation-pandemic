@@ -1,0 +1,25 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# Data: keep raw/processed dirs but ignore large downloads
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Experiment outputs
+runs/
+checkpoints/
+*.csv
+*.png
+*.pdf
+!docs/**/*.png
+!docs/**/*.pdf
+
+# OS
+.DS_Store
