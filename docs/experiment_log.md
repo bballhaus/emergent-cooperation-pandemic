@@ -1,29 +1,49 @@
 # Experiment Log
 
-Running record of changes made to improve RL performance, with pre- vs post-change
-results. The motivating problem: the proportional-to-need **heuristic beats every RL
-variant at every sweep point** (see `runs/aggregated.csv`). Two diagnosed causes:
+Running record of the effort to improve RL performance. For each experiment we record
+**(a) why we ran it** (what the previous result implied), **(b) the exact config/code
+delta from the previous state**, **(c) the results**, and **(d) the decision** that leads
+into the next experiment. This makes the chain of reasoning auditable end-to-end.
+
+## Motivating problem
+
+The proportional-to-need **heuristic beats every RL variant at every sweep point** (see
+`runs/aggregated_baseline.csv`). Diagnosis identified two causes:
 
 1. **Observation blind spot** — agents saw only other cities' infection rate (`I/N`),
    never their hospitalized load or stockpile, so they couldn't see *net need*.
 2. **No targeting credit** — reward was purely local (own deaths + own unmet), so
-   "send a ventilator to the city that needed it" was never reinforced. This is also
-   why DQN won among RL by *hoarding*.
+   "send a ventilator to the city that needed it" was never reinforced. This also explains
+   why DQN was the best RL variant *by hoarding* (transfers had no upside).
 
-Baseline for all comparisons is the pushed grid in `runs/aggregated.csv` (plain obs,
-no targeting reward, heterogeneous beta, 1500 iters, 5 seeds).
+**Baseline (E0):** the pushed grid, `runs/aggregated_baseline.csv` — plain obs, no transfer
+shaping, heterogeneous beta, 1500 iters, 5 seeds.
+
+## Experiment index
+
+| #  | Change                                   | Default-config result          | Verdict        |
+|----|------------------------------------------|--------------------------------|----------------|
+| E0 | Baseline (plain obs, local reward only)  | RL loses to heuristic; DQN hoards | reference   |
+| E1 | Targeting reward (∝ gross giving)        | monotonically worse as weight↑ | ❌ reverted    |
+| E2 | Rich obs alone (others' H/N, stockpile)  | +2–4% deaths (all algos)       | ❌ off by default |
+| E3 | **Impact reward (saturating) + rich obs**| IPPO −4.1%, peer −3.7% deaths; Gini ~halved | ✅ **kept** |
+| E4 | Full grid re-run under E3 config         | _in progress_                  | _pending_      |
+
+All experiments below use the **default 4-city config** unless stated. "Δ" is vs the
+relevant control in the same table. Lower deaths / lower Gini = better.
 
 ---
 
-## Change 1 — Need-targeted transfer reward  ❌ REVERTED (negative result)
+## E1 — Need-targeted transfer reward  ❌ REVERTED (negative result)
 
-**What:** Added `targeting_reward_weight`. A sender earns
-`weight x (ventilators delivered) x (recipient I/N at arrival)` when its transfer
-*arrives* at a city, giving direct credit for need-targeted giving.
-Files: `src/env/pandemic_env.py` (EnvConfig field + step `1b` bonus), `config_loader.py`,
-`configs/env_default.yaml`.
+**Why this experiment:** the diagnosis said transfers earn no credit, so the first idea
+was to directly pay an agent for sending to a needy city.
 
-**A/B (peer, default config, seed 0, 600 iters), sweeping the weight:**
+**Config/code delta from E0:** added `targeting_reward_weight` (EnvConfig field + step `1b`
+bonus in `src/env/pandemic_env.py`, threaded through `config_loader.py` + `env_default.yaml`).
+A sender earns `weight x (ventilators delivered) x (recipient I/N at arrival)`.
+
+**A/B (peer, seed 0, 600 iters), sweeping the weight:**
 
 | targeting weight | deaths | Gini  |
 |------------------|-------:|------:|
@@ -33,27 +53,28 @@ Files: `src/env/pandemic_env.py` (EnvConfig field + step `1b` bonus), `config_lo
 | 1.0              | 251,026| 0.114 |
 | 5.0              | 280,230| 0.144 |
 
-**Result:** monotonically *harmful* — even the smallest positive weight raises deaths
-and worsens equity. Cause: the bonus rewards *gross* giving to any infected city,
-regardless of whether the recipient lacked ventilators or the sender could spare them.
-PPO already over-transfers, so paying it to transfer more amplifies the failure.
+**Result:** monotonically *harmful* — even the smallest positive weight raises deaths and
+worsens equity. Cause: the bonus rewards *gross* giving to any infected city, regardless of
+whether the recipient lacked ventilators or the sender could spare them. PPO already
+over-transfers, so paying it to transfer more amplifies the failure.
 
-**Decision:** default `targeting_reward_weight: 0.0`. Mechanism kept in code as a
-documented negative-result ablation knob.
+**Decision → next:** set `targeting_reward_weight: 0.0` (kept as a negative-result knob).
+The failure says the *shape* is wrong (volume, not impact) — but maybe the agent also can't
+*see* who needs help. So next we test observations in isolation (E2).
 
 ---
 
-## Change 2 — Richer observations (other cities' H/N + stockpile/N)
+## E2 — Richer observations alone (others' H/N + stockpile/N)
 
-**What:** Added `rich_observations` (default true). Each agent now also sees, per other
-city, hospitalized load `H/N` (ventilator-demand proxy) and stockpile `S_v/N` (supply),
-in addition to `I/N` — so it can compute *net need = demand − supply*, the signal the
-heuristic exploits. Obs dim grows from `9 + (n-1)` to `9 + 3(n-1)`. `false` reproduces
-the original observation for the ablation.
-Files: `src/env/pandemic_env.py` (`_obs_dim`, `_observe`), `config_loader.py`,
-`configs/env_default.yaml`.
+**Why this experiment:** isolate whether the observation blind spot is the bottleneck,
+independent of any reward shaping (E1 reverted, so reward is local-only here).
 
-**A/B (PPO family, default config, 3 seeds, 1000 iters), mean over seeds:**
+**Config/code delta from E1:** added `rich_observations` flag (`_obs_dim`, `_observe` in
+`pandemic_env.py`). Each agent now sees, per other city, `H/N` (ventilator-demand proxy)
+and `S_v/N` (supply) in addition to `I/N`, so it can compute *net need = demand − supply*.
+Obs dim grows `9 + (n−1) → 9 + 3(n−1)`. Reward unchanged (local only).
+
+**A/B (PPO family, 3 seeds, 1000 iters), mean over seeds:**
 
 | algo  | obs   | deaths  | welfare  | Gini   | Δ deaths (rich−plain) |
 |-------|-------|--------:|---------:|-------:|----------------------:|
@@ -65,35 +86,33 @@ Files: `src/env/pandemic_env.py` (`_obs_dim`, `_observe`), `config_loader.py`,
 | peer  | rich  | 236,530 | -257,985 | 0.1126 | +4,484 (+1.9%)        |
 
 **Result:** slightly *harmful* for every algo (+2–4% deaths). With a purely local reward
-the agent gets no benefit from knowing other cities' need, so the extra `2(n−1)` input
-dims act as noise that the policy overfits to. (An earlier single-seed run showed lower
-Gini, but that did not survive 3-seed averaging.)
+the agent gets no benefit from knowing others' need, so the extra `2(n−1)` dims act as
+noise it overfits to. (A single-seed run showed lower Gini; it did not survive 3-seed
+averaging.)
 
-**Decision (interim):** `rich_observations` harmful alone — but see Change 3, where it
-pairs with the impact reward to become part of the winning config.
-
----
-
-## Takeaway after Changes 1 & 2
-
-Both naive levers failed for the *same* reason: the reward gives no benefit to good
-transfers, so (a) exposing need has nothing to act on, and (b) a gross giving-bonus just
-amplifies PPO's existing over-transfer. The fix has to be a **better-shaped cooperation
-incentive that rewards transfer _impact_, not volume**.
+**Decision → next:** keep `rich_observations` off *by itself*. E1 and E2 together show the
+two levers fail for the **same reason** — the reward gives no benefit to good transfers, so
+(a) seeing need is useless and (b) rewarding volume backfires. Implication: we need a reward
+that rewards transfer **impact**, and *then* the observations may finally be actionable.
+That combined hypothesis is E3.
 
 ---
 
-## Change 3 — Saturating impact reward (+ rich obs)  ✅ KEPT (works)
+## E3 — Saturating impact reward (+ rich obs)  ✅ KEPT (works)
 
-**What:** Added `impact_reward_weight`. When a transfer arrives, the sender is credited
-`weight x min(delivered, recipient_shortfall)` where `shortfall = H - stockpile_before`.
-Because it is capped at the recipient's actual shortfall, the credit **saturates** —
-ventilators beyond need earn nothing, so dumping is not rewarded (the failure mode of
-Change 1). Paired with rich observations so the agent can both *see* need and be *rewarded*
-for meeting it. Files: `src/env/pandemic_env.py` (EnvConfig field + step `1c`),
-`config_loader.py`, `configs/env_default.yaml`.
+**Why this experiment:** direct consequence of E1+E2 — reward *useful* giving (capped at
+real need so it can't be gamed by dumping), and pair it with the observations that expose
+that need.
 
-**Weight sweep (peer, default, seed 0, 600 iters, rich obs):**
+**Config/code delta from E2:** added `impact_reward_weight` (EnvConfig field + step `1c` in
+`pandemic_env.py`). When a transfer arrives, the sender is credited
+`weight x min(delivered, recipient_shortfall)`, `shortfall = H − stockpile_before`. Capped
+at the recipient's actual shortfall, so the credit **saturates** — ventilators beyond need
+earn nothing (fixing E1's dumping failure). Also flipped `rich_observations: true` so the
+need signal is visible. Net default change from E0: `impact_reward_weight 0→1.0`,
+`rich_observations false→true`, `targeting_reward_weight` stays 0.
+
+**Weight sweep (peer, seed 0, 600 iters, rich obs):**
 
 | impact weight | deaths  | Gini   | welfare  |
 |---------------|--------:|-------:|---------:|
@@ -118,13 +137,33 @@ for meeting it. Files: `src/env/pandemic_env.py` (EnvConfig field + step `1c`),
 | peer  | rich, impact=2.0 | 230,967 | -250,866 | 0.0568 | -1,079 (-0.5%)  | -0.048  |
 
 **Result:** at `w=1.0` the impact reward cuts **IPPO** deaths −4.1% and **peer** deaths
-−3.7%, and roughly halves Gini for both — i.e. it teaches *decentralized* agents to
-cooperate, closing toward MAPPO's centralized ceiling. **MAPPO** (already team-rewarded)
-does not benefit (+5% deaths), as expected: it already internalizes others' welfare, so
-the extra shaping is redundant/destabilizing. The RL agents still do not beat the
-proportional-to-need heuristic, but the gap and the equity disadvantage shrink markedly.
+−3.7%, and roughly halves Gini for both — it teaches *decentralized* agents to cooperate,
+closing toward MAPPO's centralized ceiling. **MAPPO** (already team-rewarded) does not
+benefit (+5%): it already internalizes others' welfare, so the extra shaping is
+redundant/destabilizing. RL still does not beat the heuristic, but the gap and the equity
+disadvantage shrink markedly. `w=1.0` best for deaths, `w=2.0` best for Gini; chose `1.0`.
 
-**Decision:** new default `impact_reward_weight: 1.0`, `rich_observations: true`. Next:
-re-run the full grid (all algos x sweeps x 5 seeds) under this config for headline numbers.
+**Decision → next:** new default `impact_reward_weight: 1.0`, `rich_observations: true`.
+Validate at scale: re-run the full grid for 5-seed/1500-iter headline numbers (E4).
+
+---
+
+## E4 — Full grid re-run under the E3 config  ⏳ IN PROGRESS
+
+**Why this experiment:** E3's win is shown at the default config with 3 seeds / 1000 iters.
+Confirm it holds across the full scarcity + city-count sweeps at publication settings, and
+quantify the new RL-vs-heuristic gap everywhere.
+
+**Config/code delta from E3:** none to the model — same `env_default.yaml` (impact=1.0,
+rich obs). Operational: preserved the E0 numbers as `runs/aggregated_baseline.csv`, cleared
+the 160 stale per-seed dirs (so the resumable runner re-trains rather than skipping), and
+launched `scripts/run_grid_parallel.py --workers 8` (4 algos × 8 sweep points × 5 seeds ×
+1500 iters).
+
+**Results:** _pending — will record new `runs/aggregated.csv` vs `aggregated_baseline.csv`
+deltas per algo/sweep, regenerate learning curves + token-flow plots, and summarize the
+remaining heuristic gap here._
+
+<!-- E4_RESULTS -->
 
 ---

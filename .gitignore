@@ -22,7 +22,9 @@ checkpoints/
 !docs/**/*.pdf
 # Summary results to surface on GitHub (parent runs/ is not excluded, so these re-include)
 !runs/aggregated.csv
+!runs/aggregated_baseline.csv
 !runs/run_timings.csv
+!runs/run_timings_baseline.csv
 !runs/heuristic_baseline.json
 !runs/peer_token_flows.csv
 !runs/peer_token_flows.png
