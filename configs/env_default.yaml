@@ -6,6 +6,24 @@ weekly_supply_per_capita: 5.0e-5    # scarcity knob; see configs/scarcity_sweep.
 death_reward_weight: 1.0
 unmet_reward_weight: 0.01
 reward_scale: 1.0e-3
+# Targeting bonus (NEGATIVE-RESULT ABLATION, off): a sender earns targeting_reward_weight
+# x (ventilators delivered) x (recipient I/N at arrival). An A/B sweep found it
+# monotonically harmful (rewards GROSS giving, amplifying PPO's over-transfer). Kept only
+# as a knob; superseded by impact_reward_weight below.
+targeting_reward_weight: 0.0
+
+# Impact bonus (the working cooperation incentive): a sender earns impact_reward_weight x
+# (delivered ventilators that fell within the recipient's shortfall, H - prior stockpile).
+# Saturates once demand is met, so dumping surplus earns nothing. A 3-seed A/B found w=1.0
+# cuts IPPO/peer deaths ~4% and roughly halves Gini vs the selfish baseline (MAPPO, already
+# team-rewarded, does not benefit). This is the default improvement.
+impact_reward_weight: 1.0
+
+# Rich observations: expose every other city's hospitalized load (H/N) and stockpile
+# (S_v/N) alongside infection rate (I/N), so agents can see net need (demand - supply).
+# Harmful on its own (no reward to act on it), but PAIRED WITH the impact bonus it is part
+# of the winning config. true => (I/N, H/N, S_v/N) per other city; false => I/N only.
+rich_observations: true
 
 initial_infected_per_city: 50
 initial_stockpile: 0

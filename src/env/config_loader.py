@@ -42,6 +42,9 @@ def build_env_config(yaml_dict: dict[str, Any]) -> EnvConfig:
         death_reward_weight=float(yaml_dict.get("death_reward_weight", 1.0)),
         unmet_reward_weight=float(yaml_dict.get("unmet_reward_weight", 0.01)),
         reward_scale=float(yaml_dict.get("reward_scale", 1e-3)),
+        targeting_reward_weight=float(yaml_dict.get("targeting_reward_weight", 0.0)),
+        impact_reward_weight=float(yaml_dict.get("impact_reward_weight", 0.0)),
+        rich_observations=bool(yaml_dict.get("rich_observations", True)),
     )
 
 

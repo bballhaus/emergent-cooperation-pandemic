@@ -2,7 +2,8 @@
 
 Each city is an agent. Per daily timestep, an agent observes:
   - own SEIR compartments (normalized by population), own stockpile, own hospital capacity
-  - public infection counts of every other city (only I/N is public; H, D, stockpile are private)
+  - for every other city, a public need/supply triple: infection rate (I/N),
+    hospitalized load (H/N, the ventilator-demand proxy), and stockpile (S_v/N)
   - episode time signal
 
 The agent's action is a non-negative vector of length `n_cities`. We normalize it to a
@@ -45,6 +46,14 @@ class EnvConfig:
     death_reward_weight: float = 1.0     # cost of one death (in reward units)
     unmet_reward_weight: float = 0.01    # cost per unmet ventilator-day
     reward_scale: float = 1e-3           # global multiplier to keep PPO returns in a sane range
+    targeting_reward_weight: float = 0.0 # bonus to a sender per (ventilator x recipient need)
+                                         # when its transfer ARRIVES at a needy city. 0 = off
+                                         # (selfish baseline); >0 shapes need-targeted giving.
+    impact_reward_weight: float = 0.0    # bonus to a sender per delivered ventilator that
+                                         # fell within the recipient's shortfall (saturating
+                                         # impact credit). 0 = off; >0 rewards useful giving.
+    rich_observations: bool = True       # True => each agent sees other cities' (I/N, H/N,
+                                         # stockpile/N); False => only I/N (original obs).
 
 
 class PandemicEnv(ParallelEnv):
@@ -62,7 +71,8 @@ class PandemicEnv(ParallelEnv):
         self.agents: list[str] = []
         self.cities: list[City] = [City.from_config(c) for c in config.cities]
 
-        self._obs_dim = 9 + (self.n_cities - 1)  # see _observe()
+        per_other = 3 if config.rich_observations else 1
+        self._obs_dim = 9 + per_other * (self.n_cities - 1)  # see _observe()
         self._action_dim = self.n_cities
 
         self._obs_spaces = {
@@ -99,8 +109,39 @@ class PandemicEnv(ParallelEnv):
 
     def step(self, actions: dict[str, np.ndarray]):
         # 1. Deliver any transfers that arrive today (before allocation decisions use them).
+        # Snapshot pre-arrival stockpiles so impact credit can measure how many arriving
+        # ventilators actually fell within the recipient's unmet need.
+        stockpile_before = [c.stockpile for c in self.cities]
         for c in self.cities:
             c.receive_arrivals(self.day)
+
+        # 1b. Targeting credit (NEGATIVE-RESULT ABLATION, off by default): a sender earns a
+        # bonus proportional to (ventilators delivered) x (recipient I/N). Rewards GROSS
+        # giving, which amplified PPO's over-transfer and was harmful — kept only as a knob.
+        targeting_bonus = np.zeros(self.n_cities, dtype=np.float64)
+        if self.config.targeting_reward_weight > 0.0:
+            for j, recipient in enumerate(self.cities):
+                need_j = recipient.state.I / max(recipient.config.population, 1)
+                for sender_id, amount in recipient.transfers_received_this_step.items():
+                    if 0 <= sender_id < self.n_cities:
+                        targeting_bonus[sender_id] += amount * need_j
+
+        # 1c. Impact credit: a sender is rewarded only for the delivered ventilators that
+        # fall within the recipient's actual shortfall (H - stockpile it already had).
+        # min(delivered, shortfall) SATURATES once demand is met, so dumping surplus on a
+        # city earns nothing — the key difference from the gross targeting bonus above.
+        impact_bonus = np.zeros(self.n_cities, dtype=np.float64)
+        if self.config.impact_reward_weight > 0.0:
+            for j, recipient in enumerate(self.cities):
+                received = recipient.transfers_received_this_step
+                total_delivered = sum(received.values())
+                if total_delivered <= 0:
+                    continue
+                shortfall = max(recipient.state.H - stockpile_before[j], 0.0)
+                useful = min(float(total_delivered), shortfall)
+                for sender_id, amount in received.items():
+                    if 0 <= sender_id < self.n_cities:
+                        impact_bonus[sender_id] += useful * (amount / total_delivered)
 
         # 2. Weekly central-reserve replenishment.
         if self.day > 0 and self.day % 7 == 0:
@@ -126,9 +167,13 @@ class PandemicEnv(ParallelEnv):
             city.state = new_state
             diagnostics_per_city.append(diag)
 
-            r = -(
-                self.config.death_reward_weight * new_deaths
-                + self.config.unmet_reward_weight * diag["unmet_vent_demand"]
+            r = (
+                -(
+                    self.config.death_reward_weight * new_deaths
+                    + self.config.unmet_reward_weight * diag["unmet_vent_demand"]
+                )
+                + self.config.targeting_reward_weight * targeting_bonus[i]
+                + self.config.impact_reward_weight * impact_bonus[i]
             ) * self.config.reward_scale
             rewards[self.agents[i]] = float(r)
 
@@ -190,15 +235,28 @@ class PandemicEnv(ParallelEnv):
             ],
             dtype=np.float32,
         )
-        others_I = np.array(
-            [
-                self.cities[j].state.I / max(self.cities[j].config.population, 1)
-                for j in range(self.n_cities)
-                if j != i
-            ],
-            dtype=np.float32,
-        )
-        return np.concatenate([own, others_I], dtype=np.float32)
+        # Public need/supply signal for every other city. With rich_observations, expose
+        # infection rate (I/N), hospitalized load (H/N, the ventilator-demand proxy), and
+        # stockpile (S_v/N, their on-hand supply) — so an agent can compute net need
+        # (demand minus supply), the signal the proportional-to-need heuristic exploits.
+        # Otherwise expose only I/N (the original observation) for the ablation.
+        others = []
+        for j in range(self.n_cities):
+            if j == i:
+                continue
+            Nj = max(self.cities[j].config.population, 1)
+            if self.config.rich_observations:
+                others.extend(
+                    [
+                        self.cities[j].state.I / Nj,
+                        self.cities[j].state.H / Nj,
+                        self.cities[j].stockpile / Nj,
+                    ]
+                )
+            else:
+                others.append(self.cities[j].state.I / Nj)
+        others_arr = np.array(others, dtype=np.float32)
+        return np.concatenate([own, others_arr], dtype=np.float32)
 
     def _apply_actions(self, actions: dict[str, np.ndarray]) -> list[dict]:
         """Convert each agent's action vector into integer allocations and execute transfers."""
