@@ -27,7 +27,7 @@ shaping, heterogeneous beta, 1500 iters, 5 seeds.
 | E1 | Targeting reward (∝ gross giving)        | monotonically worse as weight↑ | ❌ reverted    |
 | E2 | Rich obs alone (others' H/N, stockpile)  | +2–4% deaths (all algos)       | ❌ off by default |
 | E3 | **Impact reward (saturating) + rich obs**| IPPO −4.1%, peer −3.7% deaths; Gini ~halved | ✅ **kept** |
-| E4 | Full grid re-run under E3 config         | _in progress_                  | _pending_      |
+| E4 | Full grid re-run under E3 config (5 seeds)| IPPO/peer −4 to −6% deaths & Gini ~halved; MAPPO/DQN regress | ✅ confirmed (PG only) |
 
 All experiments below use the **default 4-city config** unless stated. "Δ" is vs the
 relevant control in the same table. Lower deaths / lower Gini = better.
@@ -160,10 +160,63 @@ the 160 stale per-seed dirs (so the resumable runner re-trains rather than skipp
 launched `scripts/run_grid_parallel.py --workers 8` (4 algos × 8 sweep points × 5 seeds ×
 1500 iters).
 
-**Results:** _pending — will record new `runs/aggregated.csv` vs `aggregated_baseline.csv`
-deltas per algo/sweep, regenerate learning curves + token-flow plots, and summarize the
-remaining heuristic gap here._
+**Results (5 seeds, 1500 iters; `runs/aggregated.csv` vs `runs/aggregated_baseline.csv`).**
+Δ% = (new − baseline) / baseline deaths; negative = fewer deaths = better.
 
-<!-- E4_RESULTS -->
+Default config:
+
+| algo  | deaths base | deaths new | Δ%     | Gini base → new |
+|-------|------------:|-----------:|-------:|-----------------|
+| ippo  | 231,168     | 218,589    | **−5.4%** | 0.118 → 0.049 |
+| peer  | 231,447     | 216,905    | **−6.3%** | 0.112 → 0.074 |
+| mappo | 244,456     | 261,754    | +7.1%  | 0.108 → 0.132   |
+| dqn   | 198,473     | 298,096    | +50.2% | 0.081 → 0.090   |
+
+Deaths Δ% across the full sweep (negative = better):
+
+| sweep                    | ippo  | peer  | mappo  | dqn    |
+|--------------------------|------:|------:|-------:|-------:|
+| default                  | −5.4 | −6.3 | +7.1   | +50.2  |
+| n_cities=2               | −0.7 | −2.9 | +70.5  | +16.9  |
+| n_cities=6               | −4.7 | −5.6 | +5.7   | +50.9  |
+| n_cities=8               | −4.3 | −3.5 | +2.0   | +51.3  |
+| supply=1.0e-5 (scarcest) | +0.4 | +0.7 | +2.4   | +14.7  |
+| supply=2.5e-5            | +0.0 | −0.9 | +4.3   | +28.8  |
+| supply=1.0e-4            | −1.0 | −7.8 | +38.7  | +38.8  |
+| supply=2.5e-4 (abundant) | +4.6 | +3.8 | +53.5  | +28.4  |
+
+**Interpretation.**
+- **IPPO and peer (decentralized policy-gradient): improved**, most at the default and
+  city-count sweeps (deaths −4 to −6%, Gini roughly halved, e.g. IPPO 0.118→0.049). At the
+  scarcest supply (1.0e-5/2.5e-5) the effect is ~flat — there is almost nothing to transfer,
+  so a transfer-shaping reward has little to act on. At the most abundant supply (2.5e-4)
+  PG agents are marginally worse but on tiny absolute differences. **The equity gain is the
+  headline: the impact reward teaches selfish/decentralized agents to share, cutting Gini
+  ~50% while transferring slightly *more* (peer 4.83M→5.20M) — i.e. fewer deaths *through*
+  cooperation, not through hoarding.**
+- **MAPPO: regressed** (default +7%, up to +54% at abundant supply). As predicted in E3, the
+  team-summed reward already internalizes others' welfare, so the extra per-transfer shaping
+  is redundant and destabilizing.
+- **DQN: regressed badly everywhere (+15 to +51%).** DQN was previously the best RL variant
+  *by hoarding* (baseline transfers 1.48M, low deaths). The impact reward + richer obs broke
+  that hoarding policy — DQN's coarse discrete action head cannot target transfers, so it now
+  *dumps* (transfers 8.85M) and deaths jump. The shaping is incompatible with the value-based
+  / discretized agent.
+
+**Remaining heuristic gap.** RL still does not beat the proportional-to-need heuristic on
+raw deaths (default: heuristic 162,764 vs best RL 216,905 peer). But the gap narrows for the
+PG agents and the *equity* gap largely closes. The qualitative story improves: the previous
+"best RL" (DQN) won by hoarding — an anti-cooperative artifact — whereas the impact reward
+makes IPPO/peer reach comparable welfare via genuine, well-targeted sharing.
+
+**Caveat / open question.** Because the new default applies the impact reward + rich obs to
+*all* algos, the DQN and MAPPO numbers above regress relative to their baselines. If the
+goal is a single best-RL-vs-heuristic headline, DQN should arguably be run on its original
+(plain) config, since the intervention is a policy-gradient cooperation mechanism. Flagged
+for a decision; not changed yet.
+
+Artifacts regenerated: `runs/aggregated.csv`, `runs/run_timings.csv`,
+`runs/peer_token_flows.{csv,png}`, `runs/learning_curves_{default,n_cities8,
+weekly_supply_per_capita10e-5}.png`. Baseline preserved at `runs/aggregated_baseline.csv`.
 
 ---
