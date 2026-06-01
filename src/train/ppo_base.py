@@ -32,12 +32,21 @@ class PPOConfig:
     clip_ratio: float = 0.2
     value_clip: float = 0.2
     vf_coef: float = 0.5
-    ent_coef: float = 0.01
+    # Advantages are normalized to unit std, so the policy-loss gradient is ~O(1) regardless
+    # of reward scale; a 0.01 entropy bonus on a Dirichlet (entropy ~ -2) then dominates and
+    # the policy never leaves near-uniform (milestone diagnosis: "exploration bonus dominates").
+    # Start lower and anneal to zero so late training is reward-driven.
+    ent_coef: float = 0.002
+    ent_coef_final: float = 0.0
     gamma: float = 0.99
     gae_lambda: float = 0.95
-    lr: float = 3e-4
+    # 3e-4 (the usual PPO default) overshoots here: training drifts into a degenerate
+    # high-transfer mode and deaths/unmet blow up after ~500 iters. 5e-5 is stable and keeps
+    # improving monotonically through 2000 iters in this env.
+    lr: float = 5e-5
     max_grad_norm: float = 0.5
     hidden: int = 128
+    local_init_bias: float = 6.0  # init Dirichlet prior toward keeping stockpile local; see Actor
     seed: int = 0
     log_every: int = 10
     device: str = "cpu"
@@ -96,7 +105,9 @@ class PPOBase:
             action_dim=self.action_dim,
             hidden=config.hidden,
             has_token_head=self.has_token_head,
+            local_init_bias=config.local_init_bias,
         ).to(self.device)
+        self._ent_coef_now = config.ent_coef
         self.critic = Critic(
             input_dim=self._critic_input_dim(),
             hidden=config.hidden,
@@ -110,9 +121,21 @@ class PPOBase:
         self.log_dir = Path(config.log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self._csv = (self.log_dir / "metrics.csv").open("w")
-        self._csv.write("iteration,env_steps,welfare,deaths,unmet,transfers,gini,worst_capita,policy_loss,value_loss,entropy\n")
+        header = "iteration,env_steps,welfare,deaths,unmet,transfers,gini,worst_capita,policy_loss,value_loss,entropy"
+        extra_cols = self._extra_csv_columns()
+        if extra_cols:
+            header += "," + ",".join(extra_cols)
+        self._csv.write(header + "\n")
 
     # --- subclass hooks ---
+    def _extra_csv_columns(self) -> list[str]:
+        """Extra metrics.csv columns (e.g. peer-incentive token stats). Base logs none."""
+        return []
+
+    def _extra_csv_values(self, ep_metrics: dict) -> list:
+        """Values for `_extra_csv_columns`, in the same order. Base logs none."""
+        return []
+
     def _critic_input_dim(self) -> int:
         raise NotImplementedError
 
@@ -249,7 +272,7 @@ class PPOBase:
                 vl2 = (v_clipped - returns_norm) ** 2
                 value_loss = torch.max(vl1, vl2).mean()
 
-                loss = policy_loss + cfg.vf_coef * value_loss - cfg.ent_coef * entropy
+                loss = policy_loss + cfg.vf_coef * value_loss - self._ent_coef_now * entropy
                 self.optim.zero_grad()
                 loss.backward()
                 nn.utils.clip_grad_norm_(
@@ -280,16 +303,24 @@ class PPOBase:
         )
         t0 = time.time()
         for it in range(1, cfg.total_iterations + 1):
+            # Linearly anneal the entropy bonus from ent_coef -> ent_coef_final over training.
+            frac = (it - 1) / max(cfg.total_iterations - 1, 1)
+            self._ent_coef_now = cfg.ent_coef + frac * (cfg.ent_coef_final - cfg.ent_coef)
+
             ep_metrics = self.collect_rollout(buffer)
             stats = self.update(buffer)
             env_steps = it * cfg.rollout_len
-            self._csv.write(
+            row = (
                 f"{it},{env_steps},"
                 f"{ep_metrics['welfare']:.2f},{ep_metrics['total_deaths']:.0f},"
                 f"{ep_metrics['total_unmet_vent_days']:.0f},{ep_metrics['transfers_sent_total']:.0f},"
                 f"{ep_metrics['gini_deaths_per_capita']:.4f},{ep_metrics['worst_city_deaths_per_capita']:.5f},"
-                f"{stats['policy_loss']:.4f},{stats['value_loss']:.4f},{stats['entropy']:.4f}\n"
+                f"{stats['policy_loss']:.4f},{stats['value_loss']:.4f},{stats['entropy']:.4f}"
             )
+            extra = self._extra_csv_values(ep_metrics)
+            if extra:
+                row += "," + ",".join(str(v) for v in extra)
+            self._csv.write(row + "\n")
             self._csv.flush()
             if it % cfg.log_every == 0 or it == 1:
                 elapsed = time.time() - t0

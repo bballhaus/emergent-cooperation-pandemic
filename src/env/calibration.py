@@ -15,6 +15,7 @@ resource), so order-of-magnitude is what matters.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -52,6 +53,47 @@ CITY_TABLE: list[tuple[str, int, int]] = [
 ]
 
 
+# Per-city ancestral-strain transmission rate (beta). The national literature default is
+# 0.30 (R0 ≈ 2.4); these encode documented early-2020 heterogeneity — dense coastal metros
+# (NYC, Chicago, Philadelphia) ran hotter than lower-density sunbelt cities (Phoenix, San
+# Antonio, San Diego). They are *literature-informed defaults*: running the CDC fit pipeline
+# (scripts/fetch_cdc_data.py → scripts/fit_city_betas.py) writes per-state fits to
+# data/processed/city_betas.json, which overrides these per city when present.
+CITY_BETA_DEFAULT: dict[str, float] = {
+    "New York":     0.36,
+    "Los Angeles":  0.30,
+    "Chicago":      0.32,
+    "Houston":      0.28,
+    "Phoenix":      0.26,
+    "Philadelphia": 0.31,
+    "San Antonio":  0.27,
+    "San Diego":    0.28,
+}
+
+# Output of scripts/fit_city_betas.py (empty until the CDC fetch+fit has been run).
+CALIBRATED_BETA_PATH = (
+    Path(__file__).resolve().parent.parent.parent / "data" / "processed" / "city_betas.json"
+)
+
+
+def load_calibrated_betas(path: Path = CALIBRATED_BETA_PATH) -> dict[str, float]:
+    """Return {city_name: fitted_beta} from the CDC-fit output, or {} if not yet produced."""
+    if not path.exists():
+        return {}
+    try:
+        raw = json.loads(path.read_text())
+        return {str(k): float(v) for k, v in raw.items()}
+    except (ValueError, OSError):
+        return {}
+
+
+def city_beta(name: str, calibrated: Optional[dict[str, float]] = None) -> float:
+    """Resolve a city's beta: CDC fit if available, else the literature-informed default."""
+    if calibrated and name in calibrated:
+        return calibrated[name]
+    return CITY_BETA_DEFAULT.get(name, COVID_DEFAULT.beta)
+
+
 def make_default_cities(
     n: int,
     base_params: SEIRParams = COVID_DEFAULT,
@@ -61,26 +103,37 @@ def make_default_cities(
     initial_infected_per_city: int = 50,
     initial_stockpile: int = 0,
     max_days: int = 180,
+    heterogeneous_beta: bool = True,
 ) -> list[CityConfig]:
     """Return `n` CityConfigs (n in 2..8) drawn from CITY_TABLE.
 
     If `stagger_shocks`, city i's surge starts on day i * (max_days // n), so demand
     peaks at different times — the structural condition that makes sharing rational
     (and unilateral hoarding tempting) under an SSD framing.
+
+    If `heterogeneous_beta`, each city gets its own transmission rate (CDC fit if present,
+    else the literature-informed CITY_BETA_DEFAULT), so cities differ in contact rate as
+    well as population/capacity/shock-timing. Set False for a uniform-beta ablation.
     """
     if n < 2 or n > len(CITY_TABLE):
         raise ValueError(f"n must be in [2, {len(CITY_TABLE)}], got {n}")
+
+    calibrated = load_calibrated_betas() if heterogeneous_beta else {}
 
     cities: list[CityConfig] = []
     for i in range(n):
         name, pop, cap = CITY_TABLE[i]
         shock_start = (i * (max_days // n)) if stagger_shocks else 30
+        if heterogeneous_beta:
+            params = SEIRParams(**{**base_params.__dict__, "beta": city_beta(name, calibrated)})
+        else:
+            params = base_params
         cities.append(
             CityConfig(
                 name=name,
                 population=pop,
                 hospital_capacity=cap,
-                seir_params=base_params,
+                seir_params=params,
                 initial_infected=initial_infected_per_city,
                 initial_stockpile=initial_stockpile,
                 shock_start_day=shock_start,

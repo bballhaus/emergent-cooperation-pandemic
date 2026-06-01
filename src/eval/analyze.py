@@ -79,6 +79,68 @@ def aggregate(root: Path, last_n: int = 10) -> pd.DataFrame:
     return pd.DataFrame(rows).sort_values(["sweep", "algo"]).reset_index(drop=True)
 
 
+def peer_token_summary(root: Path, last_n: int = 10) -> pd.DataFrame:
+    """Per-city token-flow diagnosis for peer-incentive runs.
+
+    For each (sweep, city) averages tokens *emitted* (city acknowledged a transfer it
+    received) and *received* (city was paid for donating) over the last `last_n` iters,
+    then across seeds. net = received - emitted: positive => net token recipient (donor
+    that got paid), which under staggered shocks is expected to be the pre-surge cities —
+    the mechanism behind peer's rising Gini.
+    """
+    emit_re = re.compile(r"^tokens_emitted_city(\d+)$")
+    recv_re = re.compile(r"^tokens_received_city(\d+)$")
+    cells: dict = defaultdict(lambda: defaultdict(list))  # (sweep, city) -> {"emitted":[], "received":[]}
+
+    for algo, key, val, seed, csv in parse_run_dirs(root):
+        if "peer" not in algo:
+            continue
+        df = pd.read_csv(csv)
+        if df.empty or not any(emit_re.match(c) for c in df.columns):
+            continue
+        tail = df.tail(last_n)
+        sweep_label = f"{key}={val}" if key else "default"
+        for col in df.columns:
+            m_e = emit_re.match(col)
+            m_r = recv_re.match(col)
+            if m_e:
+                cells[(sweep_label, int(m_e.group(1)))]["emitted"].append(float(tail[col].mean()))
+            elif m_r:
+                cells[(sweep_label, int(m_r.group(1)))]["received"].append(float(tail[col].mean()))
+
+    rows = []
+    for (sweep_label, city), d in sorted(cells.items()):
+        emitted = float(np.mean(d["emitted"])) if d["emitted"] else 0.0
+        received = float(np.mean(d["received"])) if d["received"] else 0.0
+        rows.append({
+            "sweep": sweep_label,
+            "city": city,
+            "tokens_emitted_mean": emitted,
+            "tokens_received_mean": received,
+            "net_received_mean": received - emitted,
+        })
+    return pd.DataFrame(rows)
+
+
+def plot_peer_tokens(df: pd.DataFrame, out_path: Path) -> None:
+    import matplotlib.pyplot as plt
+    sweeps = list(dict.fromkeys(df["sweep"]))
+    fig, axes = plt.subplots(1, len(sweeps), figsize=(5 * len(sweeps), 4), squeeze=False)
+    for ax, sweep in zip(axes[0], sweeps):
+        grp = df[df["sweep"] == sweep].sort_values("city")
+        x = np.arange(len(grp))
+        ax.bar(x - 0.2, grp["tokens_emitted_mean"], width=0.4, label="emitted (ack)")
+        ax.bar(x + 0.2, grp["tokens_received_mean"], width=0.4, label="received (donate)")
+        ax.set_xticks(x)
+        ax.set_xticklabels([f"city {c}" for c in grp["city"]])
+        ax.set_title(f"peer token flow ({sweep})")
+        ax.set_ylabel("tokens / episode (last-10 avg)")
+        ax.legend()
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=120)
+    print(f"Saved peer token-flow plot to {out_path}")
+
+
 def plot_metric(root: Path, df: pd.DataFrame, metric: str, out_path: Path) -> None:
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots(figsize=(7, 4))
@@ -115,6 +177,18 @@ def main() -> int:
     print(f"\nWrote {out}")
     if args.plot:
         plot_metric(args.root, df, args.plot, args.root / f"plot_{args.plot}.png")
+
+    # Peer-incentive per-city token-flow diagnosis (only if peer runs logged token columns).
+    tokens = peer_token_summary(args.root, last_n=args.last_n)
+    if not tokens.empty:
+        tok_out = args.root / "peer_token_flows.csv"
+        tokens.to_csv(tok_out, index=False)
+        print(f"\n{tokens.to_string(index=False)}")
+        print(f"Wrote {tok_out}")
+        try:
+            plot_peer_tokens(tokens, args.root / "peer_token_flows.png")
+        except Exception as e:  # plotting is optional; don't fail aggregation on a headless box
+            print(f"(skipped peer token plot: {e})")
     return 0
 
 

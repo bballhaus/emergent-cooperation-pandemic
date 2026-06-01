@@ -12,14 +12,21 @@ data/processed/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 
-# Experiment outputs
-runs/
+# Experiment outputs: ignore bulky per-seed files + checkpoints, keep summary artifacts
+runs/*
 checkpoints/
 *.csv
 *.png
 *.pdf
 !docs/**/*.png
 !docs/**/*.pdf
+# Summary results to surface on GitHub (parent runs/ is not excluded, so these re-include)
+!runs/aggregated.csv
+!runs/run_timings.csv
+!runs/heuristic_baseline.json
+!runs/peer_token_flows.csv
+!runs/peer_token_flows.png
+!runs/learning_*.png
 
 # OS
 .DS_Store

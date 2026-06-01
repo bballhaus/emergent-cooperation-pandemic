@@ -32,6 +32,7 @@ def build_env_config(yaml_dict: dict[str, Any]) -> EnvConfig:
         initial_infected_per_city=int(yaml_dict.get("initial_infected_per_city", 50)),
         initial_stockpile=int(yaml_dict.get("initial_stockpile", 0)),
         max_days=int(yaml_dict.get("max_days", 180)),
+        heterogeneous_beta=bool(yaml_dict.get("heterogeneous_beta", True)),
     )
     return EnvConfig(
         cities=cities,

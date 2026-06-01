@@ -53,12 +53,19 @@ class Actor(nn.Module):
         action_dim: int,
         hidden: int = 128,
         has_token_head: bool = False,
+        local_init_bias: float = 0.0,
     ):
         super().__init__()
         self.n_agents = n_agents
         self.action_dim = action_dim
         self.has_token_head = has_token_head
         self.input_dim = obs_dim + n_agents
+        # Additive prior on the agent's own allocation slot (index == agent id, since
+        # action_dim == n_agents here: slot i is "use locally", slots j!=i are transfers).
+        # Without it the Dirichlet inits near-uniform, so agents blindly transfer ~(n-1)/n of
+        # their stockpile every step (milestone: 9M transfers, deaths worse than the heuristic).
+        # It only shifts the init; alloc_head can learn negative logits to transfer more.
+        self.local_init_bias = local_init_bias if action_dim == n_agents else 0.0
 
         self.trunk = nn.Sequential(
             nn.Linear(self.input_dim, hidden), nn.Tanh(),
@@ -75,9 +82,13 @@ class Actor(nn.Module):
 
     def forward(self, obs: torch.Tensor, agent_id: torch.Tensor) -> ActorOutput:
         z = self.trunk(self._featurize(obs, agent_id))
+        logits = self.alloc_head(z)
+        if self.local_init_bias != 0.0:
+            local = F.one_hot(agent_id, num_classes=self.action_dim).float()
+            logits = logits + self.local_init_bias * local
         # +1 shifts concentration above 1, keeping the distribution well-behaved near uniform
         # at init (avoids collapsing to a corner of the simplex with infinite log-prob spikes).
-        alpha = F.softplus(self.alloc_head(z)) + 1.0
+        alpha = F.softplus(logits) + 1.0
         alloc = Dirichlet(alpha)
         token = None
         if self.has_token_head:

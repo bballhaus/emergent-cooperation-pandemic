@@ -27,32 +27,27 @@ from src.agents import (
 )
 
 
+def _ppo_kwargs(args) -> dict:
+    return dict(
+        total_iterations=args.iterations,
+        seed=args.seed,
+        lr=args.lr,
+        log_dir=args.log_dir,
+        device=args.device,
+        ent_coef=args.ent_coef,
+        ent_coef_final=args.ent_coef_final,
+        local_init_bias=args.local_init_bias,
+    )
+
+
 def build_trainer(algo: str, env, args):
     if algo == "ippo":
-        cfg = PPOConfig(
-            total_iterations=args.iterations,
-            seed=args.seed,
-            lr=args.lr,
-            log_dir=args.log_dir,
-            device=args.device,
-        )
-        return IPPOTrainer(env, cfg)
+        return IPPOTrainer(env, PPOConfig(**_ppo_kwargs(args)))
     if algo == "mappo":
-        cfg = PPOConfig(
-            total_iterations=args.iterations,
-            seed=args.seed,
-            lr=args.lr,
-            log_dir=args.log_dir,
-            device=args.device,
-        )
-        return MAPPOTrainer(env, cfg)
+        return MAPPOTrainer(env, PPOConfig(**_ppo_kwargs(args)))
     if algo == "peer":
         cfg = PeerIncentiveConfig(
-            total_iterations=args.iterations,
-            seed=args.seed,
-            lr=args.lr,
-            log_dir=args.log_dir,
-            device=args.device,
+            **_ppo_kwargs(args),
             token_budget=args.token_budget,
             token_exchange_rate=args.token_exchange_rate,
         )
@@ -76,11 +71,17 @@ def main() -> int:
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--iterations", type=int, default=200,
                    help="PPO iterations (rollouts) or DQN episodes")
-    p.add_argument("--lr", type=float, default=3e-4)
+    p.add_argument("--lr", type=float, default=5e-5,
+                   help="3e-4 overshoots in this env (late collapse to high-transfer mode); 5e-5 is stable")
+    p.add_argument("--ent-coef", type=float, default=0.002, help="initial entropy bonus coefficient")
+    p.add_argument("--ent-coef-final", type=float, default=0.0,
+                   help="entropy coef at end of training (linear anneal)")
+    p.add_argument("--local-init-bias", type=float, default=6.0,
+                   help="init Dirichlet prior toward keeping stockpile local (0 = uniform)")
     p.add_argument("--log-dir", default=None)
     p.add_argument("--device", default="cpu")
     p.add_argument("--token-budget", type=int, default=100)
-    p.add_argument("--token-exchange-rate", type=float, default=1e-4)
+    p.add_argument("--token-exchange-rate", type=float, default=5e-3)
     args = p.parse_args()
 
     if args.log_dir is None:

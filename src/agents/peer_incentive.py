@@ -32,7 +32,11 @@ from ..train.ppo_base import PPOConfig
 @dataclass
 class PeerIncentiveConfig(PPOConfig):
     token_budget: int = 100        # per-agent tokens available per episode
-    token_exchange_rate: float = 1e-4   # reward bonus per token (in env's reward units)
+    # Reward bonus per token, already in the env's (scaled) reward units. At 1e-4 the bonus
+    # was both ~1000x too small (double reward_scale bug, now removed) and negligible vs a
+    # per-step reward of order ~1 during a surge, so donating never paid off. Raised so a full
+    # token budget (~0.5 reward) can offset the marginal cost of giving up ventilators.
+    token_exchange_rate: float = 5e-3
     log_token_stats_every: int = 10
 
 
@@ -50,10 +54,17 @@ class PeerIncentiveTrainer(IPPOTrainer):
         # without matching welfare gains => agents are inflating tokens, not actually sharing).
         self._cum_tokens_emitted = 0
         self._cum_transfers_received = 0
+        # Per-episode per-city token flows, for the equity diagnosis: who acknowledges (emits)
+        # vs who gets rewarded (donates). Under staggered shocks we expect pre-surge cities to
+        # be net donors and get most tokens, which is what drives peer's rising Gini.
+        self._per_city_emitted = np.zeros(self.n_agents, dtype=np.int64)
+        self._per_city_received = np.zeros(self.n_agents, dtype=np.int64)
         self._reset_episode_state()
 
     def _reset_episode_state(self) -> None:
         self._budget = np.full(self.n_agents, self.pi_cfg.token_budget, dtype=np.int64)
+        self._per_city_emitted = np.zeros(self.n_agents, dtype=np.int64)
+        self._per_city_received = np.zeros(self.n_agents, dtype=np.int64)
 
     def collect_rollout(self, buffer) -> dict:
         # Hook in episode-state reset before the base class kicks off the env reset.
@@ -66,7 +77,25 @@ class PeerIncentiveTrainer(IPPOTrainer):
             self._cum_tokens_emitted / max(self._cum_transfers_received, 1)
         )
         ep["token_to_transfer_ratio"] = float(ratio)
+        ep["per_city_tokens_emitted"] = self._per_city_emitted.tolist()
+        ep["per_city_tokens_received"] = self._per_city_received.tolist()
         return ep
+
+    def _extra_csv_columns(self) -> list[str]:
+        cols = ["tokens_emitted_cum", "transfers_received_cum", "token_to_transfer_ratio"]
+        cols += [f"tokens_emitted_city{i}" for i in range(self.n_agents)]
+        cols += [f"tokens_received_city{i}" for i in range(self.n_agents)]
+        return cols
+
+    def _extra_csv_values(self, ep_metrics: dict) -> list:
+        vals: list = [
+            ep_metrics["tokens_emitted_cumulative"],
+            ep_metrics["transfers_received_cumulative"],
+            f"{ep_metrics['token_to_transfer_ratio']:.4f}",
+        ]
+        vals += list(ep_metrics["per_city_tokens_emitted"])
+        vals += list(ep_metrics["per_city_tokens_received"])
+        return vals
 
     def _maybe_shape_reward(
         self,
@@ -96,13 +125,16 @@ class PeerIncentiveTrainer(IPPOTrainer):
             if tokens_to_emit <= 0:
                 continue
 
-            # Distribute proportional to sender contribution.
+            # Distribute proportional to sender contribution. The bonus is already in the
+            # env's scaled reward units (r_raw is scaled), so no extra reward_scale here.
             for sender_id, amount in received.items():
                 share = amount / max(total_received, 1)
                 allocated = int(round(tokens_to_emit * share))
                 if allocated <= 0:
                     continue
-                r[sender_id] += self.pi_cfg.token_exchange_rate * allocated * self.env.config.reward_scale
+                r[sender_id] += self.pi_cfg.token_exchange_rate * allocated
                 self._cum_tokens_emitted += allocated
+                self._per_city_emitted[i] += allocated
+                self._per_city_received[sender_id] += allocated
             self._budget[i] -= tokens_to_emit
         return r

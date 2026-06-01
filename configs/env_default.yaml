@@ -16,3 +16,8 @@ initial_stockpile: 0
 stagger_shocks: true
 shock_duration: 30
 shock_magnitude: 2.0
+
+# Per-city transmission rate (beta): true => cities differ in contact rate (CDC fit from
+# data/processed/city_betas.json if present, else literature-informed CITY_BETA_DEFAULT).
+# Set false for a uniform-beta ablation where only shock timing/population/capacity differ.
+heterogeneous_beta: true
