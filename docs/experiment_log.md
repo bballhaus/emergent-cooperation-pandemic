@@ -148,7 +148,7 @@ Validate at scale: re-run the full grid for 5-seed/1500-iter headline numbers (E
 
 ---
 
-## E4 — Full grid re-run under the E3 config  ⏳ IN PROGRESS
+## E4 — Full grid re-run under the E3 config  ✅ COMPLETE
 
 **Why this experiment:** E3's win is shown at the default config with 3 seeds / 1000 iters.
 Confirm it holds across the full scarcity + city-count sweeps at publication settings, and
