@@ -1,0 +1,5 @@
+sweep,city,tokens_emitted_mean,tokens_received_mean,net_received_mean
+default,0,98.82,132.88,34.06
+default,1,98.41999999999999,87.94,-10.47999999999999
+default,2,98.26,81.34,-16.92
+default,3,98.5,91.84,-6.659999999999997

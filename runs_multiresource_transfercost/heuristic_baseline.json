@@ -1,0 +1,224 @@
+{
+  "default": {
+    "proportional_to_need": {
+      "welfare_mean": -232191.57584445836,
+      "total_deaths_mean": 216020.65970018803,
+      "unmet_vent_days_mean": 1617091.6144270299,
+      "transfers_sent_mean": 405390.0,
+      "gini_mean": 0.08976251915958411,
+      "worst_capita_mean": 0.014199190786495402,
+      "per_seed": [
+        {
+          "welfare": -232191.57584445836,
+          "total_deaths": 216020.65970018806,
+          "total_unmet_vent_days": 1617091.6144270299,
+          "transfers_sent_total": 405390,
+          "gini_deaths_per_capita": 0.08976251915958411,
+          "worst_city_deaths_per_capita": 0.014199190786495402,
+          "per_city_deaths": [
+            106377.16983626073,
+            51058.108973195944,
+            38996.487185741535,
+            19588.89370498985
+          ],
+          "per_city_population": [
+            8336817,
+            3898747,
+            2746388,
+            2304580
+          ]
+        },
+        {
+          "welfare": -232191.57584445836,
+          "total_deaths": 216020.65970018806,
+          "total_unmet_vent_days": 1617091.6144270299,
+          "transfers_sent_total": 405390,
+          "gini_deaths_per_capita": 0.08976251915958411,
+          "worst_city_deaths_per_capita": 0.014199190786495402,
+          "per_city_deaths": [
+            106377.16983626073,
+            51058.108973195944,
+            38996.487185741535,
+            19588.89370498985
+          ],
+          "per_city_population": [
+            8336817,
+            3898747,
+            2746388,
+            2304580
+          ]
+        },
+        {
+          "welfare": -232191.57584445836,
+          "total_deaths": 216020.65970018806,
+          "total_unmet_vent_days": 1617091.6144270299,
+          "transfers_sent_total": 405390,
+          "gini_deaths_per_capita": 0.08976251915958411,
+          "worst_city_deaths_per_capita": 0.014199190786495402,
+          "per_city_deaths": [
+            106377.16983626073,
+            51058.108973195944,
+            38996.487185741535,
+            19588.89370498985
+          ],
+          "per_city_population": [
+            8336817,
+            3898747,
+            2746388,
+            2304580
+          ]
+        },
+        {
+          "welfare": -232191.57584445836,
+          "total_deaths": 216020.65970018806,
+          "total_unmet_vent_days": 1617091.6144270299,
+          "transfers_sent_total": 405390,
+          "gini_deaths_per_capita": 0.08976251915958411,
+          "worst_city_deaths_per_capita": 0.014199190786495402,
+          "per_city_deaths": [
+            106377.16983626073,
+            51058.108973195944,
+            38996.487185741535,
+            19588.89370498985
+          ],
+          "per_city_population": [
+            8336817,
+            3898747,
+            2746388,
+            2304580
+          ]
+        },
+        {
+          "welfare": -232191.57584445836,
+          "total_deaths": 216020.65970018806,
+          "total_unmet_vent_days": 1617091.6144270299,
+          "transfers_sent_total": 405390,
+          "gini_deaths_per_capita": 0.08976251915958411,
+          "worst_city_deaths_per_capita": 0.014199190786495402,
+          "per_city_deaths": [
+            106377.16983626073,
+            51058.108973195944,
+            38996.487185741535,
+            19588.89370498985
+          ],
+          "per_city_population": [
+            8336817,
+            3898747,
+            2746388,
+            2304580
+          ]
+        }
+      ]
+    },
+    "selfish_hoarding": {
+      "welfare_mean": -183437.8239431817,
+      "total_deaths_mean": 177903.1545370704,
+      "unmet_vent_days_mean": 553466.9406111293,
+      "transfers_sent_mean": 0.0,
+      "gini_mean": 0.06974739154145415,
+      "worst_capita_mean": 0.011630546835711969,
+      "per_seed": [
+        {
+          "welfare": -183437.8239431817,
+          "total_deaths": 177903.1545370704,
+          "total_unmet_vent_days": 553466.9406111293,
+          "transfers_sent_total": 0,
+          "gini_deaths_per_capita": 0.06974739154145415,
+          "worst_city_deaths_per_capita": 0.011630546835711969,
+          "per_city_deaths": [
+            90324.11797769913,
+            36265.983186801364,
+            31941.994263037323,
+            19371.059109532587
+          ],
+          "per_city_population": [
+            8336817,
+            3898747,
+            2746388,
+            2304580
+          ]
+        },
+        {
+          "welfare": -183437.8239431817,
+          "total_deaths": 177903.1545370704,
+          "total_unmet_vent_days": 553466.9406111293,
+          "transfers_sent_total": 0,
+          "gini_deaths_per_capita": 0.06974739154145415,
+          "worst_city_deaths_per_capita": 0.011630546835711969,
+          "per_city_deaths": [
+            90324.11797769913,
+            36265.983186801364,
+            31941.994263037323,
+            19371.059109532587
+          ],
+          "per_city_population": [
+            8336817,
+            3898747,
+            2746388,
+            2304580
+          ]
+        },
+        {
+          "welfare": -183437.8239431817,
+          "total_deaths": 177903.1545370704,
+          "total_unmet_vent_days": 553466.9406111293,
+          "transfers_sent_total": 0,
+          "gini_deaths_per_capita": 0.06974739154145415,
+          "worst_city_deaths_per_capita": 0.011630546835711969,
+          "per_city_deaths": [
+            90324.11797769913,
+            36265.983186801364,
+            31941.994263037323,
+            19371.059109532587
+          ],
+          "per_city_population": [
+            8336817,
+            3898747,
+            2746388,
+            2304580
+          ]
+        },
+        {
+          "welfare": -183437.8239431817,
+          "total_deaths": 177903.1545370704,
+          "total_unmet_vent_days": 553466.9406111293,
+          "transfers_sent_total": 0,
+          "gini_deaths_per_capita": 0.06974739154145415,
+          "worst_city_deaths_per_capita": 0.011630546835711969,
+          "per_city_deaths": [
+            90324.11797769913,
+            36265.983186801364,
+            31941.994263037323,
+            19371.059109532587
+          ],
+          "per_city_population": [
+            8336817,
+            3898747,
+            2746388,
+            2304580
+          ]
+        },
+        {
+          "welfare": -183437.8239431817,
+          "total_deaths": 177903.1545370704,
+          "total_unmet_vent_days": 553466.9406111293,
+          "transfers_sent_total": 0,
+          "gini_deaths_per_capita": 0.06974739154145415,
+          "worst_city_deaths_per_capita": 0.011630546835711969,
+          "per_city_deaths": [
+            90324.11797769913,
+            36265.983186801364,
+            31941.994263037323,
+            19371.059109532587
+          ],
+          "per_city_population": [
+            8336817,
+            3898747,
+            2746388,
+            2304580
+          ]
+        }
+      ]
+    }
+  }
+}

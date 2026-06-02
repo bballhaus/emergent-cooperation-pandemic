@@ -7,6 +7,14 @@ Ventilator availability affects mortality among hospitalized: the fraction of H 
 receives a ventilator dies at rate `mu_vent`; the unventilated fraction dies at rate
 `mu_no_vent > mu_vent`. Total flux out of H is `gamma_h * H`; the death/recovery split
 is determined by ventilator coverage.
+
+Two further resources act through simplified channels (lightweight multi-resource model):
+  - Vaccines move susceptibles directly to recovered/immune (S -> R), scaled by
+    `vaccine_efficacy`. One dose immunizes one susceptible (capped at S).
+  - PPE reduces effective transmission for the day: `ppe_used` units of coverage reduce
+    beta multiplicatively up to `ppe_max_reduction`, with coverage measured against the
+    infectious pool (the people whose contacts PPE has to interrupt).
+Both default to no-op (0 used) so the ventilator-only path is unchanged.
 """
 
 from dataclasses import dataclass, field
@@ -22,6 +30,8 @@ class SEIRParams:
     gamma_h: float = 1.0 / 14.0 # H -> (R or D) rate (1 / average ICU stay; ~14 days)
     mu_no_vent: float = 0.90 / 14.0  # daily death rate in H without ventilator
     mu_vent: float = 0.40 / 14.0     # daily death rate in H with ventilator
+    vaccine_efficacy: float = 0.9    # fraction of administered doses that immunize (S -> R)
+    ppe_max_reduction: float = 0.5   # max multiplicative reduction of beta at full PPE coverage
 
 
 @dataclass
@@ -57,17 +67,31 @@ def step_seir(
     params: SEIRParams,
     ventilators_used: float,
     beta_multiplier: float = 1.0,
+    vaccines_used: float = 0.0,
+    ppe_used: float = 0.0,
 ) -> tuple[CompartmentState, dict]:
     """Advance the SEIHRD state by one day. Returns new state and a diagnostics dict.
 
     `ventilators_used` is the number of currently-hospitalized patients receiving
     ventilation (capped at H by the caller). `beta_multiplier` lets the env apply a
-    transient demand shock (e.g., 2x baseline during a surge window).
+    transient demand shock (e.g., 2x baseline during a surge window). `vaccines_used`
+    immunizes susceptibles (S -> R) and `ppe_used` reduces effective beta for the day;
+    both default to 0 (ventilator-only behavior unchanged).
     """
     S, E, I, H, R, D = state.S, state.E, state.I, state.H, state.R, state.D
+
+    # Vaccination: doses move susceptibles to recovered/immune before mixing this day.
+    vaccinated = min(max(vaccines_used, 0.0) * params.vaccine_efficacy, S)
+    S -= vaccinated
+    R += vaccinated
+
     N_alive = S + E + I + H + R  # exclude dead from mixing pool
 
-    beta = params.beta * beta_multiplier
+    # PPE: coverage relative to the infectious pool reduces effective transmission.
+    ppe_coverage = min(max(ppe_used, 0.0) / max(I, 1e-9), 1.0)
+    ppe_factor = 1.0 - params.ppe_max_reduction * ppe_coverage
+
+    beta = params.beta * beta_multiplier * ppe_factor
     new_infections = beta * S * I / max(N_alive, 1.0)
     new_infections = min(new_infections, S)  # cannot exceed susceptible pool
 
@@ -98,5 +122,7 @@ def step_seir(
         "deaths_today": deaths_from_H,
         "unmet_vent_demand": unmet_vent_demand,
         "vent_coverage": vent_coverage,
+        "vaccinated": vaccinated,
+        "ppe_coverage": ppe_coverage,
     }
     return new_state, diagnostics

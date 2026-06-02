@@ -1,0 +1,30 @@
+# Multi-resource baseline config: impact reward OFF and plain observations, matching the
+# E0 single-resource baseline but with vaccines + PPE. Used for the MAPPO/DQN half of the
+# best-config-per-algo table (the impact-reward cooperation mechanism is policy-gradient
+# specific; MAPPO/DQN are best on their plain config). See configs/env_multiresource.yaml.
+n_cities: 4
+max_days: 180
+transit_days: 1
+
+weekly_supply_per_capita: 5.0e-5
+resources: [ventilator, vaccine, ppe]
+resource_supply_per_capita: {}
+
+death_reward_weight: 1.0
+unmet_reward_weight: 0.01
+reward_scale: 1.0e-3
+targeting_reward_weight: 0.0
+
+# Baseline: cooperation shaping off, original (I/N-only) observations.
+impact_reward_weight: 0.0
+rich_observations: false
+
+transfer_cost_frac: 0.0
+
+initial_infected_per_city: 50
+initial_stockpile: 0
+
+stagger_shocks: true
+shock_duration: 30
+shock_magnitude: 2.0
+heterogeneous_beta: true

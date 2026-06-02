@@ -58,7 +58,7 @@ def sweep_label(scarcity: str, ncities: str) -> str:
 
 
 def baselines_for(scarcity: str, ncities: str) -> dict:
-    base_yaml = load_yaml("env_default.yaml")
+    base_yaml = load_yaml(os.environ.get("BASE_CONFIG", "env_default.yaml"))
     base_yaml["weekly_supply_per_capita"] = float(scarcity)
     base_yaml["n_cities"] = int(ncities)
     env = PandemicEnv(build_env_config(base_yaml))
@@ -106,7 +106,7 @@ def main() -> int:
                     f"{r['gini_mean']:>6.3f} {r['worst_capita_mean']:>10.5f}"
                 )
 
-    out_path = REPO / "runs" / "heuristic_baseline.json"
+    out_path = Path(os.environ.get("OUT_PATH", str(REPO / "runs" / "heuristic_baseline.json")))
     out_path.parent.mkdir(parents=True, exist_ok=True)
     # Merge into any existing baselines so the scarcity-pass and city-count-pass can be run
     # separately and accumulate into one file keyed by sweep label.

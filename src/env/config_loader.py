@@ -34,6 +34,10 @@ def build_env_config(yaml_dict: dict[str, Any]) -> EnvConfig:
         max_days=int(yaml_dict.get("max_days", 180)),
         heterogeneous_beta=bool(yaml_dict.get("heterogeneous_beta", True)),
     )
+    resources = list(yaml_dict.get("resources", ["ventilator"]))
+    resource_supply = {
+        str(k): float(v) for k, v in dict(yaml_dict.get("resource_supply_per_capita", {})).items()
+    }
     return EnvConfig(
         cities=cities,
         max_days=int(yaml_dict.get("max_days", 180)),
@@ -45,6 +49,9 @@ def build_env_config(yaml_dict: dict[str, Any]) -> EnvConfig:
         targeting_reward_weight=float(yaml_dict.get("targeting_reward_weight", 0.0)),
         impact_reward_weight=float(yaml_dict.get("impact_reward_weight", 0.0)),
         rich_observations=bool(yaml_dict.get("rich_observations", True)),
+        transfer_cost_frac=float(yaml_dict.get("transfer_cost_frac", 0.0)),
+        resources=resources,
+        resource_supply_per_capita=resource_supply,
     )
 
 

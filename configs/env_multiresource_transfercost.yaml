@@ -1,0 +1,32 @@
+# Heuristic-breaks regime: multi-resource env with a 30% transit loss on every transfer
+# (transfer_cost_frac). The static proportional-to-need heuristic ships large volumes
+# regardless of cost, so a lossy channel wastes resources; learned policies can adapt by
+# transferring more selectively. Used to show the SSD heuristics are not robust to costly
+# cooperation while RL agents are. Same impact-reward cooperation config as
+# env_multiresource.yaml otherwise.
+n_cities: 4
+max_days: 180
+transit_days: 1
+
+weekly_supply_per_capita: 5.0e-5
+resources: [ventilator, vaccine, ppe]
+resource_supply_per_capita: {}
+
+death_reward_weight: 1.0
+unmet_reward_weight: 0.01
+reward_scale: 1.0e-3
+targeting_reward_weight: 0.0
+
+impact_reward_weight: 1.0
+rich_observations: true
+
+# 30% of every transferred unit is lost in transit (the heuristic-breaks knob).
+transfer_cost_frac: 0.3
+
+initial_infected_per_city: 50
+initial_stockpile: 0
+
+stagger_shocks: true
+shock_duration: 30
+shock_magnitude: 2.0
+heterogeneous_beta: true
