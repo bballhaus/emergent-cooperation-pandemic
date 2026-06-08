@@ -80,7 +80,7 @@ class City:
         return 1.0
 
     def receive_arrivals(self, day: int) -> None:
-        """Move any transfers whose arrival day has come into the matching resource stockpile."""
+        """Deposit due transfers into stockpiles."""
         self.transfers_received_this_step = {}
         remaining: list[IncomingTransfer] = []
         for t in self.incoming:
@@ -104,7 +104,7 @@ class City:
         day: int,
         resource: str = PRIMARY_RESOURCE,
     ) -> int:
-        """Send `amount` units of `resource` to `recipient`. Returns amount actually sent."""
+        """Send resource units to recipient."""
         amount = max(0, min(amount, self.stockpiles.get(resource, 0)))
         if amount == 0:
             return 0

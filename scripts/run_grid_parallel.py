@@ -1,16 +1,4 @@
-"""Parallel, resumable experiment grid runner.
-
-Runs the scarcity sweep (5 levels x {ippo,mappo,peer,dqn} x 5 seeds) and the city-count
-sweep (n=2,6,8 x 4 algos x 5 seeds) concurrently across CPU cores. Each run is pinned to a
-single thread (OMP/MKL=1) so N parallel runs use N cores without oversubscription.
-
-Resumable: a run whose metrics.csv already has the expected number of rows is skipped, so
-relaunching after a crash/sleep only does the missing work. Each run's stdout goes to its
-own <log_dir>/train.log (no interleaving).
-
-Run under caffeinate so the machine won't idle-sleep mid-grid:
-  caffeinate -i python scripts/run_grid_parallel.py --workers 8
-"""
+"""Parallel, resumable experiment grid runner."""
 
 from __future__ import annotations
 
@@ -58,13 +46,7 @@ def make_config(scarcity: str, ncities: str, base_config: str) -> Path:
 
 def build_jobs(base_config: str, runs_dir: Path, algos: list[str],
                default_only: bool = False, skip_city_sweep: bool = False) -> list[dict]:
-    """Enumerate (scarcity sweep at n=4) + (city sweep at base scarcity).
-
-    default_only restricts to the single base point (4 cities, base scarcity) for a fast
-    headline pass. skip_city_sweep keeps the scarcity sweep but drops the n_cities sweep
-    (used for the baseline grid, whose city-count robustness is already covered by the
-    impact grid).
-    """
+    """Enumerate scarcity and city sweep jobs."""
     if default_only:
         points: list[tuple[str, str]] = [(BASE_SCARCITY, BASE_NCITIES)]
     else:
@@ -149,7 +131,7 @@ def main() -> int:
 
 
 def write_timings(runs_dir: Path) -> None:
-    """Regenerate <runs_dir>/run_timings.csv from each run's train.log final timing line."""
+    """Regenerate run_timings.csv from train logs."""
     import re
     rows = []
     pat = re.compile(r"\|\s*([0-9.]+)s\s*$")

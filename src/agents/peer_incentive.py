@@ -1,21 +1,4 @@
-"""IPPO + peer incentives — the novel contribution.
-
-Each agent keeps a per-episode token budget (default 100). When agent i receives
-transfers this step (deliveries that arrived today), the actor emits a token *fraction*
-in [0, 1] from a Beta head; tokens_emitted = floor(token_frac * budget_remaining_i),
-distributed to senders in proportion to how much each sender contributed. Each token
-converts to a small reward bonus for the sender at fixed exchange rate.
-
-Design points relative to MATE (Phan et al. 2024):
-  - Continuous allocation actions, not discrete moves
-  - Asynchronous demand shocks → long lag between giving and needing
-  - Fixed per-episode budget → built-in defense against collusive token inflation;
-    we monitor `token_to_transfer_ratio` across training to detect collusion early
-
-Token bonus arrives at the receiver's ack step (one step after the original send) and
-is credited to the sender's reward at that step. GAE propagates this delayed signal
-back to the send-time action with negligible discount cost (γ^1 ≈ 0.99).
-"""
+"""IPPO with peer incentive tokens."""
 
 from __future__ import annotations
 
@@ -91,7 +74,7 @@ class PeerIncentiveTrainer(IPPOTrainer):
         agents: list[str],
         extras: dict,
     ) -> np.ndarray:
-        """Apply token bonuses to senders based on receivers' ack-step token emissions."""
+        """Apply token bonuses to senders."""
         r = r_raw.copy()
         token_fracs = extras.get("token_frac")
         if token_fracs is None:

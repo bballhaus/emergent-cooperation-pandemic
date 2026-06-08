@@ -28,7 +28,7 @@ def test_selfish_makes_no_transfers():
 
 
 def test_welfare_finite_and_negative():
-    """Welfare = -(deaths + scaled unmet). Should be finite and ≤ 0."""
+    """Welfare is finite and non-positive."""
     for cls in [ProportionalToNeedPolicy, SelfishHoardingPolicy]:
         m = _run(cls)
         assert np.isfinite(m.welfare)

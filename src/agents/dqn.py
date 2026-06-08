@@ -1,15 +1,4 @@
-"""Independent DQN baseline.
-
-Discretizes the per-agent action into K options ranging from "all local" to "mostly
-spread". Lets us test whether the cooperation/defection findings from PPO are
-policy-gradient-specific or hold across algorithm families, as called out in the proposal.
-
-Action discretization (per agent i, n_cities = N):
-  0: 100% local                                  (full hoarding)
-  1:  50% local, 50% spread equally across others
-  2:  25% local, 75% spread equally across others
-  3:  10% local, 90% spread equally across others
-"""
+"""Independent DQN baseline."""
 
 from __future__ import annotations
 

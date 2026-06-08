@@ -1,28 +1,4 @@
-"""PettingZoo ParallelEnv for multi-city pandemic resource allocation.
-
-Each city is an agent. Per daily timestep, an agent observes:
-  - own SEIR compartments (normalized by population), own stockpile, own hospital capacity
-  - for every other city, a public need/supply triple: infection rate (I/N),
-    hospitalized load (H/N, the ventilator-demand proxy), and stockpile (S_v/N)
-  - episode time signal
-
-The agent's action is a non-negative vector of length `n_cities`. We normalize it to a
-simplex; entry i (the agent's own index) is the fraction of its stockpile to use locally
-this day, and entry j (j != i) is the fraction to transfer to city j (arriving after
-`transit_days`).
-
-Reward is per-city (selfish): a negative linear combination of new deaths and unmet
-ventilator-days today. MAPPO/centralized algorithms can sum these into a team reward
-in their own update loops; the env stays reward-structure-agnostic.
-
-A central reserve replenishes the system every 7 days by distributing
-`total_weekly_supply` ventilators proportional to population. Scarcity is controlled
-by `weekly_supply_per_capita` in the config.
-
-Demand shocks are staggered across cities (each city's beta is multiplied by
-`shock_magnitude` during its `shock_duration`-day window), so unilateral hoarding is
-locally tempting but globally costly — the structural SSD condition.
-"""
+"""Multi-city pandemic resource-allocation env."""
 
 from __future__ import annotations
 
@@ -55,7 +31,7 @@ class EnvConfig:
 
 
 class PandemicEnv(ParallelEnv):
-    """PettingZoo ParallelEnv. Agents = cities, indexed 0..n-1, named 'city_i'."""
+    """ParallelEnv with cities as agents."""
 
     metadata = {"name": "pandemic_multi_city_v0", "is_parallelizable": True}
 
@@ -204,7 +180,7 @@ class PandemicEnv(ParallelEnv):
         pass
 
     def global_state(self) -> np.ndarray:
-        """Concatenated city observations + day signal; centralized MAPPO critic input."""
+        """Concatenated city observations."""
         parts = [self._observe(i) for i in range(self.n_cities)]
         return np.concatenate(parts, dtype=np.float32)
 
@@ -243,13 +219,7 @@ class PandemicEnv(ParallelEnv):
         return np.concatenate([own, others_arr], dtype=np.float32)
 
     def _apply_actions(self, actions: dict[str, np.ndarray]) -> list[dict]:
-        """Apply each agent's single allocation simplex to every resource it holds.
-
-        The same fractions (local-use vs transfer-to-each-other) are applied to each
-        resource's own stockpile — a lightweight simplification with no per-resource
-        targeting. Returns, per agent, the units used locally for each resource and the
-        total units sent across all resources.
-        """
+        """Apply allocation simplices to stockpiles."""
         allocations: list[dict] = []
         keep = 1.0 - max(self.config.transfer_cost_frac, 0.0)
         for i, agent in enumerate(self.agents):

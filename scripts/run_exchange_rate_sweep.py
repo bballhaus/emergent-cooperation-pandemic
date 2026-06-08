@@ -1,16 +1,4 @@
-"""Peer token exchange-rate sensitivity sweep.
-
-The peer-incentive algo trades cooperation tokens at a fixed --token-exchange-rate (reward
-per token). This sweeps that rate to test how sensitive peer's welfare/equity are to the
-price of cooperation. The default rate (5e-3) is already covered by the main
-runs_multiresource/peer_seed* runs, so we only run the OTHER rates here and fold the
-default in at analysis time.
-
-Runs peer on the multi-resource impact config (env_multiresource.yaml) at the base point,
-parallel across cores, resumable (skips runs whose metrics.csv is already complete).
-
-  caffeinate -i .venv/bin/python scripts/run_exchange_rate_sweep.py --workers 9
-"""
+"""Peer token exchange-rate sensitivity sweep."""
 
 from __future__ import annotations
 

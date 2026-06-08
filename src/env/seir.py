@@ -1,21 +1,4 @@
-"""SEIHRD compartmental dynamics with ventilator-conditional mortality.
-
-Compartments: S (susceptible), E (exposed), I (infectious), H (hospitalized/critical),
-R (recovered), D (dead). Discrete daily timestep with Euler discretization.
-
-Ventilator availability affects mortality among hospitalized: the fraction of H that
-receives a ventilator dies at rate `mu_vent`; the unventilated fraction dies at rate
-`mu_no_vent > mu_vent`. Total flux out of H is `gamma_h * H`; the death/recovery split
-is determined by ventilator coverage.
-
-Two further resources act through simplified channels (lightweight multi-resource model):
-  - Vaccines move susceptibles directly to recovered/immune (S -> R), scaled by
-    `vaccine_efficacy`. One dose immunizes one susceptible (capped at S).
-  - PPE reduces effective transmission for the day: `ppe_used` units of coverage reduce
-    beta multiplicatively up to `ppe_max_reduction`, with coverage measured against the
-    infectious pool (the people whose contacts PPE has to interrupt).
-Both default to no-op (0 used) so the ventilator-only path is unchanged.
-"""
+"""SEIHRD dynamics with ventilator-conditional mortality."""
 
 from dataclasses import dataclass, field
 import numpy as np
@@ -36,7 +19,7 @@ class SEIRParams:
 
 @dataclass
 class CompartmentState:
-    """Continuous-valued compartment counts (we don't round to ints for stability)."""
+    """Continuous-valued compartment counts."""
     S: float
     E: float
     I: float
@@ -70,14 +53,7 @@ def step_seir(
     vaccines_used: float = 0.0,
     ppe_used: float = 0.0,
 ) -> tuple[CompartmentState, dict]:
-    """Advance the SEIHRD state by one day. Returns new state and a diagnostics dict.
-
-    `ventilators_used` is the number of currently-hospitalized patients receiving
-    ventilation (capped at H by the caller). `beta_multiplier` lets the env apply a
-    transient demand shock (e.g., 2x baseline during a surge window). `vaccines_used`
-    immunizes susceptibles (S -> R) and `ppe_used` reduces effective beta for the day;
-    both default to 0 (ventilator-only behavior unchanged).
-    """
+    """Advance SEIHRD state by one day."""
     S, E, I, H, R, D = state.S, state.E, state.I, state.H, state.R, state.D
 
     vaccinated = min(max(vaccines_used, 0.0) * params.vaccine_efficacy, S)

@@ -1,17 +1,4 @@
-"""Calibration: literature-default SEIR parameters, city demographic table,
-and a least-squares fit of beta from a CDC case-count time series.
-
-Data sources (see scripts/fetch_cdc_data.py to pull):
-  - CDC United States COVID-19 Cases and Deaths by State Over Time
-    https://data.cdc.gov/Case-Surveillance/United-States-COVID-19-Cases-and-Deaths-by-State-o/9mfq-cb36
-  - U.S. Census Bureau state population estimates (2020-2024)
-  - AHA hospital statistics (ICU bed counts per state) — used for hospital_capacity defaults.
-
-Hospital-capacity numbers below are *staffed adult ICU beds* per state (rounded), drawn
-from the HHS Protect Public Data Hub late-2021 snapshot. They serve as obs-scaling
-constants only; the env does not impose a hard cap (ventilator stockpile is the binding
-resource), so order-of-magnitude is what matters.
-"""
+"""SEIR defaults, city table, and beta calibration."""
 
 from __future__ import annotations
 
@@ -66,7 +53,7 @@ CALIBRATED_BETA_PATH = (
 
 
 def load_calibrated_betas(path: Path = CALIBRATED_BETA_PATH) -> dict[str, float]:
-    """Return {city_name: fitted_beta} from the CDC-fit output, or {} if not yet produced."""
+    """Load fitted city betas."""
     if not path.exists():
         return {}
     try:
@@ -77,7 +64,7 @@ def load_calibrated_betas(path: Path = CALIBRATED_BETA_PATH) -> dict[str, float]
 
 
 def city_beta(name: str, calibrated: Optional[dict[str, float]] = None) -> float:
-    """Resolve a city's beta: CDC fit if available, else the literature-informed default."""
+    """Resolve a city's beta."""
     if calibrated and name in calibrated:
         return calibrated[name]
     return CITY_BETA_DEFAULT.get(name, COVID_DEFAULT.beta)
@@ -94,16 +81,7 @@ def make_default_cities(
     max_days: int = 180,
     heterogeneous_beta: bool = True,
 ) -> list[CityConfig]:
-    """Return `n` CityConfigs (n in 2..8) drawn from CITY_TABLE.
-
-    If `stagger_shocks`, city i's surge starts on day i * (max_days // n), so demand
-    peaks at different times — the structural condition that makes sharing rational
-    (and unilateral hoarding tempting) under an SSD framing.
-
-    If `heterogeneous_beta`, each city gets its own transmission rate (CDC fit if present,
-    else the literature-informed CITY_BETA_DEFAULT), so cities differ in contact rate as
-    well as population/capacity/shock-timing. Set False for a uniform-beta ablation.
-    """
+    """Build n CityConfigs from CITY_TABLE."""
     if n < 2 or n > len(CITY_TABLE):
         raise ValueError(f"n must be in [2, {len(CITY_TABLE)}], got {n}")
 
@@ -140,13 +118,7 @@ def fit_beta_from_cases(
     initial_infected: int = 10,
     burn_in_days: int = 5,
 ) -> float:
-    """Least-squares fit of `beta` against a daily-new-cases time series.
-
-    Runs the SEIHRD model forward for `len(daily_new_cases)` days at a grid of beta
-    values, picks the beta whose simulated `new_infections` minimize squared log-error
-    against the observed series. We skip the first `burn_in_days` to avoid noise from
-    seeding effects.
-    """
+    """Least-squares fit of beta to case data."""
     from .seir import CompartmentState, step_seir
 
     candidate_betas = np.linspace(0.05, 0.80, 76)
@@ -169,11 +141,7 @@ def fit_beta_from_cases(
 
 
 def load_cdc_state_data(csv_path: Path, state: str) -> Optional[np.ndarray]:
-    """Load daily new cases for one state from CDC 9mfq-cb36 CSV (downloaded separately).
-
-    Returns the chronologically-sorted new-case array, or None if the file is missing.
-    The CDC file has columns: submission_date, state, tot_cases, new_case, ...
-    """
+    """Load one state's daily new cases."""
     if not csv_path.exists():
         return None
     import pandas as pd

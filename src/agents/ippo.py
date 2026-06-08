@@ -1,9 +1,4 @@
-"""Independent PPO. Per-agent selfish reward; per-agent critic on own observation + agent ID.
-
-This is the "no enforced cooperation" baseline from Leibo et al. 2017 lifted to the
-SEIR setting. If IPPO underperforms MAPPO and the peer-incentive condition closes the
-gap, that's the positive finding the proposal is after.
-"""
+"""Independent PPO baseline."""
 
 from __future__ import annotations
 

@@ -1,23 +1,4 @@
-"""Heuristic sanity-floor experiment, swept across scarcity and city count.
-
-Runs the proportional-to-need and selfish-hoarding heuristics (no RL) and reports
-welfare/equity/cooperation metrics. This is the *floor* the RL agents must beat, and the
-central claim of the project is that the heuristic floor degrades at high scarcity — so we
-need a baseline at *every sweep point*, not just the default config.
-
-The sweep is controlled by env vars that mirror scripts/run_all_experiments.sh, so the
-heuristic baselines line up with the RL run labels used by src/eval/analyze.py:
-
-  bash:                                       sweep_label written to JSON
-  (defaults)                                  -> "default"
-  SCARCITIES="1.0e-5 5.0e-5 2.5e-4" ...        -> "weekly_supply_per_capita=<val>"
-  N_CITIES="2 4 6 8" ...                       -> "n_cities=<val>"
-
-Usage:
-  python scripts/run_heuristic_baseline.py
-  SCARCITIES="1.0e-5 2.5e-5 5.0e-5 1.0e-4 2.5e-4" python scripts/run_heuristic_baseline.py
-  N_CITIES="2 4 6 8" python scripts/run_heuristic_baseline.py
-"""
+"""Heuristic baseline sweep across scarcity and city count."""
 
 from __future__ import annotations
 
@@ -48,7 +29,7 @@ def run_episode(env: PandemicEnv, policy, seed: int = 0) -> dict:
 
 
 def sweep_label(scarcity: str, ncities: str) -> str:
-    """Match the single key=val tag that run_all_experiments.sh / analyze.py use."""
+    """Build the sweep-point label."""
     if ncities != BASE_NCITIES:
         return f"n_cities={ncities}"
     if scarcity != BASE_SCARCITY:

@@ -1,18 +1,4 @@
-"""Plot training curves (metric vs. iteration) from per-seed metrics.csv files.
-
-This is the milestone "Figure 1"-style diagnostic: it shows *how* each algorithm learns
-over training (deaths falling, transfers settling, entropy decaying = real learning rather
-than the early collapse the milestone reported), averaged across seeds with a ±1 std band.
-
-`analyze.py` summarizes the *converged* numbers (last-N mean ± CI across seeds); this module
-shows the *trajectory* that gets there.
-
-Usage:
-  python -m src.eval.learning_curves runs/                       # 4-panel default-sweep figure
-  python -m src.eval.learning_curves runs/ --metric deaths       # single metric, one panel
-  python -m src.eval.learning_curves runs/ --sweep weekly_supply_per_capita=1.0e-5
-  python -m src.eval.learning_curves runs/ --x env_steps
-"""
+"""Plot training curves from per-seed metrics.csv files."""
 
 from __future__ import annotations
 
@@ -29,10 +15,7 @@ DEFAULT_METRICS = ["deaths", "welfare", "transfers", "entropy"]
 
 
 def _collect(root: Path, sweep: str, x_col: str, metric: str):
-    """Return {algo: (x, mean, std)} for one metric, over seeds matching `sweep`.
-
-    Seeds are truncated to their common length so the per-iteration stack is rectangular.
-    """
+    """Per-algo (x, mean, std) for one metric."""
     series: dict[str, list[pd.DataFrame]] = defaultdict(list)
     for algo, key, val, seed, csv in parse_run_dirs(root):
         sweep_label = f"{key}={val}" if key else "default"

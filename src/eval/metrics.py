@@ -1,11 +1,4 @@
-"""Evaluation metrics from the proposal.
-
-Primary (welfare): total deaths + scaled unmet ventilator-days summed across cities.
-Secondary:
-  - Gini coefficient over per-city per-capita deaths (equity)
-  - Voluntary transfer volume (cooperation): total ventilators sent across all cities
-  - Worst-case city outcome (fairness): max per-capita deaths
-"""
+"""Evaluation metrics."""
 
 from __future__ import annotations
 
@@ -42,7 +35,7 @@ class EpisodeMetrics:
 
 
 def gini(values: Iterable[float]) -> float:
-    """Standard Gini coefficient. Returns 0 for perfect equality, 1 for max inequality."""
+    """Gini coefficient."""
     arr = np.array(list(values), dtype=np.float64)
     if arr.size == 0:
         return 0.0
@@ -56,7 +49,7 @@ def gini(values: Iterable[float]) -> float:
 
 
 def summarize_episode(env: PandemicEnv, unmet_weight: float = 0.01) -> EpisodeMetrics:
-    """Read cumulative counters off the env's cities after an episode ends."""
+    """Summarize episode metrics from env cities."""
     cities = env.cities
     deaths = np.array([c.cumulative_deaths for c in cities], dtype=np.float64)
     unmet = np.array([c.cumulative_unmet_vent_days for c in cities], dtype=np.float64)

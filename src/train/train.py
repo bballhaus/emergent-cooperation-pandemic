@@ -1,13 +1,4 @@
-"""Single training-run entry point.
-
-Usage:
-  python -m src.train.train --algo ippo --env-config env_default.yaml --seed 0 \
-        --iterations 200 --log-dir runs/ippo_seed0
-
-  python -m src.train.train --algo mappo  ...
-  python -m src.train.train --algo peer   ...
-  python -m src.train.train --algo dqn    ...
-"""
+"""Single training-run entry point."""
 
 from __future__ import annotations
 

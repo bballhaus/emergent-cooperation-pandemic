@@ -1,11 +1,4 @@
-"""Common PPO update for IPPO and MAPPO. Subclasses override critic input and reward shaping.
-
-Hyperparameters follow Yu et al. 2022 §A.3:
-  - 5 PPO epochs, 1 minibatch (full-batch update)
-  - clip ratio 0.2, GAE lambda 0.95, gamma 0.99
-  - value loss clipping enabled, value normalization implemented via running mean/std
-  - shared trunk with Tanh activations
-"""
+"""Common PPO update for IPPO and MAPPO."""
 
 from __future__ import annotations
 
@@ -47,7 +40,7 @@ class PPOConfig:
 
 
 class RunningNorm:
-    """Streaming mean/std for value normalization (Yu et al. recommend this for stability)."""
+    """Streaming mean/std for value normalization."""
 
     def __init__(self):
         self.mean = 0.0
@@ -76,7 +69,7 @@ class RunningNorm:
 
 
 class PPOBase:
-    """Base class. Subclasses pick critic input and reward transformation."""
+    """PPO base class."""
 
     name = "ppo_base"
     has_token_head = False
@@ -121,11 +114,11 @@ class PPOBase:
         self._csv.write(header + "\n")
 
     def _extra_csv_columns(self) -> list[str]:
-        """Extra metrics.csv columns (e.g. peer-incentive token stats). Base logs none."""
+        """Extra metrics.csv columns."""
         return []
 
     def _extra_csv_values(self, ep_metrics: dict) -> list:
-        """Values for `_extra_csv_columns`, in the same order. Base logs none."""
+        """Values for extra columns."""
         return []
 
     def _critic_input_dim(self) -> int:
@@ -135,11 +128,11 @@ class PPOBase:
         raise NotImplementedError
 
     def _reward_transform(self, rewards: np.ndarray) -> np.ndarray:
-        """Map raw per-agent rewards (shape (N,)) → per-agent training rewards (shape (N,))."""
+        """Map raw rewards to training rewards."""
         raise NotImplementedError
 
     def _act(self, obs_np: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
-        """Sample actions for all agents from current policy. Returns (actions, logp, value, extras)."""
+        """Sample actions for all agents."""
         obs = torch.from_numpy(obs_np).float().to(self.device)
         agent_ids = torch.arange(self.n_agents, device=self.device, dtype=torch.long)
         with torch.no_grad():
@@ -160,7 +153,7 @@ class PPOBase:
         return alloc.cpu().numpy(), logp_alloc.cpu().numpy(), value.cpu().numpy(), extras
 
     def collect_rollout(self, buffer: RolloutBuffer) -> dict:
-        """Run one episode and fill `buffer`. Returns episode-summary stats."""
+        """Run one episode and fill buffer."""
         from ..eval.metrics import summarize_episode
         obs_dict, _ = self.env.reset(seed=self.config.seed + buffer.ptr)
         buffer.reset()
@@ -213,7 +206,7 @@ class PPOBase:
         agents: list[str],
         extras: dict,
     ) -> np.ndarray:
-        """Hook for peer-incentive trainer; base trainers just apply _reward_transform."""
+        """Reward-shaping hook."""
         return self._reward_transform(r_raw)
 
     def update(self, buffer: RolloutBuffer) -> dict:

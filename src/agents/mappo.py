@@ -1,10 +1,4 @@
-"""MAPPO. Per-agent actor with parameter sharing; centralized critic on global state;
-team reward (sum across cities) broadcast back to each agent.
-
-This is the "cooperative ceiling" from the proposal: with full reward sharing and a
-centralized critic during training, MAPPO is the strongest cooperative baseline (Yu et
-al. 2022 show it matches or beats QMIX/MADDPG on most cooperative MARL benchmarks).
-"""
+"""MAPPO with centralized critic and team reward."""
 
 from __future__ import annotations
 

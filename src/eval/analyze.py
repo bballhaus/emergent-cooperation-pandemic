@@ -1,15 +1,4 @@
-"""Aggregate per-seed runs into a results table with 95% CIs and produce plots.
-
-Expected layout in runs/:
-  runs/<algo>_<sweep_key>=<value>_seed<seed>/metrics.csv
-  runs/<algo>_seed<seed>/metrics.csv         # for default (no sweep)
-
-Each CSV has columns including: welfare, deaths, transfers, gini, worst_capita.
-
-Usage:
-  python -m src.eval.analyze runs/                    # aggregate everything
-  python -m src.eval.analyze runs/ --plot welfare     # also produce a welfare plot
-"""
+"""Aggregate per-seed runs into a results table and plots."""
 
 from __future__ import annotations
 
@@ -29,7 +18,7 @@ DIR_RE = re.compile(
 
 
 def parse_run_dirs(root: Path):
-    """Yield (algo, sweep_key, sweep_val, seed, csv_path) for matching subdirs."""
+    """Yield run metadata for matching subdirs."""
     for d in sorted(root.iterdir()):
         if not d.is_dir():
             continue
@@ -49,8 +38,7 @@ def parse_run_dirs(root: Path):
 
 
 def aggregate(root: Path, last_n: int = 10) -> pd.DataFrame:
-    """For each (algo, sweep_key, sweep_val), compute mean + 95% CI of each metric over
-    the last `last_n` iterations of each seed's run."""
+    """Mean and 95% CI per metric across seeds."""
     cells: dict = defaultdict(lambda: defaultdict(list))
     for algo, key, val, seed, csv in parse_run_dirs(root):
         df = pd.read_csv(csv)
@@ -78,14 +66,7 @@ def aggregate(root: Path, last_n: int = 10) -> pd.DataFrame:
 
 
 def peer_token_summary(root: Path, last_n: int = 10) -> pd.DataFrame:
-    """Per-city token-flow diagnosis for peer-incentive runs.
-
-    For each (sweep, city) averages tokens *emitted* (city acknowledged a transfer it
-    received) and *received* (city was paid for donating) over the last `last_n` iters,
-    then across seeds. net = received - emitted: positive => net token recipient (donor
-    that got paid), which under staggered shocks is expected to be the pre-surge cities —
-    the mechanism behind peer's rising Gini.
-    """
+    """Per-city token-flow summary for peer runs."""
     emit_re = re.compile(r"^tokens_emitted_city(\d+)$")
     recv_re = re.compile(r"^tokens_received_city(\d+)$")
     cells: dict = defaultdict(lambda: defaultdict(list))

@@ -1,21 +1,4 @@
-"""Shared actor / critic networks.
-
-The actor outputs Dirichlet concentration parameters over the simplex of size n_cities;
-this is the natural distribution on the simplex action space the env expects (entry i is
-"fraction of stockpile to use locally", entries j != i are transfer fractions to city j).
-
-The critic is reused by both IPPO and MAPPO. The difference is in `input_dim`:
-  - IPPO: critic_input_dim = obs_dim + n_agents  (own observation + agent ID one-hot)
-  - MAPPO: critic_input_dim = obs_dim * n_agents  (concatenated global state)
-
-Parameter sharing across agents is the standard MARL trick (Yu et al. 2022 §3.2): one
-network for all agents, agent identity injected via one-hot append. This is sound here
-because the action structure is identical across agents even though populations and
-hospital capacities differ.
-
-For the peer-incentive condition, the actor exposes an optional Beta head emitting a
-scalar token fraction in [0, 1], multiplied by remaining budget by the trainer.
-"""
+"""Shared actor / critic networks."""
 
 from __future__ import annotations
 
@@ -44,7 +27,7 @@ class ActorOutput:
 
 
 class Actor(nn.Module):
-    """Outputs Dirichlet over allocation simplex; optionally a Beta for token fraction."""
+    """Dirichlet allocation actor with optional token head."""
 
     def __init__(
         self,
@@ -92,7 +75,7 @@ class Actor(nn.Module):
 
 
 class Critic(nn.Module):
-    """Scalar value head. Reused for IPPO (own-obs input) and MAPPO (global-state input)."""
+    """Scalar value critic."""
 
     def __init__(self, input_dim: int, hidden: int = 128):
         super().__init__()

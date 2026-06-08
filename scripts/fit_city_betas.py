@@ -1,8 +1,4 @@
-"""Fit per-state beta from CDC daily new-case data and write to data/processed/city_betas.json.
-
-Assumes scripts/fetch_cdc_data.py has been run. Maps each city in CITY_TABLE to a US
-state code (NY, CA, IL, TX, AZ, PA, TX, CA) and fits beta from the state's case curve.
-"""
+"""Fit per-city beta from CDC case data."""
 
 import json
 from pathlib import Path

@@ -24,7 +24,7 @@ def test_compartments_nonnegative():
 
 
 def test_ventilators_reduce_deaths():
-    """All else equal, full ventilator coverage should reduce cumulative deaths."""
+    """Ventilators reduce deaths."""
     params = SEIRParams()
     deaths = {}
     for label, vent_supply in [("none", 0.0), ("full", 1e9)]:

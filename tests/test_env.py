@@ -1,5 +1,4 @@
-"""PandemicEnv sanity checks: shape, simplex normalization, transfer accounting,
-replenishment timing, episode termination."""
+"""PandemicEnv sanity checks."""
 
 import numpy as np
 import pytest

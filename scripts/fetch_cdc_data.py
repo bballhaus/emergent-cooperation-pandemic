@@ -1,10 +1,4 @@
-"""Download CDC COVID-19 case/death data and save to data/raw/cdc_cases_by_state.csv.
-
-Source: https://data.cdc.gov/Case-Surveillance/United-States-COVID-19-Cases-and-Deaths-by-State-o/9mfq-cb36
-Endpoint returns CSV via Socrata; large file (~30MB).
-
-Usage:  python scripts/fetch_cdc_data.py
-"""
+"""Download CDC COVID-19 case data."""
 
 from pathlib import Path
 import sys

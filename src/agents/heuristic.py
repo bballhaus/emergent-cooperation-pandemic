@@ -1,13 +1,4 @@
-"""Non-RL baselines.
-
-ProportionalToNeedPolicy is the central-planner sanity floor referenced in the proposal:
-each city covers its own currently-hospitalized patients first, then sends surplus
-stockpile to other cities in proportion to their *observed* (public) infection burden
-— since H of other cities is private, we proxy unmet need with normalized I.
-
-SelfishHoardingPolicy keeps the entire stockpile local every step. This is the trivial
-defection equilibrium; if IPPO collapses here, the SSD framing is biting.
-"""
+"""Non-RL baselines."""
 
 from __future__ import annotations
 
@@ -17,7 +8,7 @@ from ..env.pandemic_env import PandemicEnv
 
 
 class ProportionalToNeedPolicy:
-    """Stateless heuristic. Operates directly on env state (white-box access)."""
+    """Proportional-to-need allocation heuristic."""
 
     def __init__(self, env: PandemicEnv):
         self.env = env
@@ -54,7 +45,7 @@ class ProportionalToNeedPolicy:
 
 
 class SelfishHoardingPolicy:
-    """Allocate the entire stockpile locally every step. No transfers, ever."""
+    """Hoard entire stockpile locally."""
 
     def __init__(self, env: PandemicEnv):
         self.env = env

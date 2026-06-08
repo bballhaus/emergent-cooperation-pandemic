@@ -1,9 +1,4 @@
-"""Rollout buffer for on-policy MARL training (IPPO and MAPPO).
-
-Stores per-agent trajectories plus optional global state for the centralized critic.
-Computes GAE advantages and returns. Iterates flattened minibatches across all agents
-and timesteps for PPO updates (Yu et al. 2022 use 5 epochs by default).
-"""
+"""Rollout buffer for on-policy MARL training."""
 
 from __future__ import annotations
 
@@ -68,7 +63,7 @@ class RolloutBuffer:
         self.ptr += 1
 
     def compute_gae(self, last_values: np.ndarray, gamma: float = 0.99, gae_lambda: float = 0.95) -> None:
-        """Standard GAE-lambda. `last_values` is the bootstrap value at step T (shape (N,))."""
+        """Compute GAE advantages and returns."""
         adv = np.zeros_like(self.rewards)
         gae = np.zeros(self.N, dtype=np.float32)
         for t in reversed(range(self.T)):
@@ -81,7 +76,7 @@ class RolloutBuffer:
         self.returns = adv + self.values
 
     def iterate_minibatches(self, n_minibatches: int):
-        """Flatten time x agent and yield random minibatches (one PPO epoch of indices)."""
+        """Yield random flattened minibatches."""
         TN = self.T * self.N
         idx = np.random.permutation(TN)
         mb_size = TN // n_minibatches
