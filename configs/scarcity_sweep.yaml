@@ -1,11 +1,8 @@
-# Scarcity sweep. Each value is a multiplier on env_default.weekly_supply_per_capita.
-# Per Leibo et al. 2017, SSD cooperation/defection equilibria depend sharply on scarcity;
-# we sweep below and above the "interesting" regime.
 base: env_default.yaml
 sweep_key: weekly_supply_per_capita
 sweep_values:
-  - 1.0e-5   # very scarce (10x less than baseline)
+  - 1.0e-5
   - 2.5e-5
-  - 5.0e-5   # baseline
+  - 5.0e-5
   - 1.0e-4
-  - 2.5e-4   # abundant
+  - 2.5e-4

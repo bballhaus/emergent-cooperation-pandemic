@@ -6,13 +6,11 @@ __pycache__/
 .venv/
 venv/
 
-# Data: keep raw/processed dirs but ignore large downloads
 data/raw/*
 data/processed/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 
-# Experiment outputs: ignore bulky per-seed files + checkpoints, keep summary artifacts
 runs/*
 checkpoints/
 *.csv
@@ -22,7 +20,6 @@ checkpoints/
 *.log
 !docs/**/*.png
 !docs/**/*.pdf
-# Summary results to surface on GitHub (parent runs/ is not excluded, so these re-include)
 !runs/aggregated.csv
 !runs/aggregated_baseline.csv
 !runs/run_timings.csv
@@ -32,10 +29,6 @@ checkpoints/
 !runs/peer_token_flows.png
 !runs/learning_*.png
 
-# Multi-resource / sweep / milestone grids — same policy: ignore per-seed checkpoints
-# (*.pt) and logs (*.log) + per-seed metrics.csv (matched by *.csv above), surface only the
-# top-level summary artifacts (single-star = top level only, never per-seed subdirs).
-# heuristic_baseline.json is not type-ignored, so it is tracked automatically.
 !runs_multiresource/*.csv
 !runs_multiresource/*.png
 !runs_multiresource_baseline/*.csv
@@ -48,5 +41,4 @@ checkpoints/
 !runs_milestone/*.png
 !runs_milestone/*.pdf
 
-# OS
 .DS_Store

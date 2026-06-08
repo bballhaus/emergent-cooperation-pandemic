@@ -1,19 +1,7 @@
-# Multi-resource 4-city env (lightweight extension of env_default.yaml).
-# Adds vaccines and PPE as additional scarce, transferable resources alongside
-# ventilators. The agent emits ONE allocation simplex (local-use vs transfer) that is
-# applied to each resource's own stockpile — no per-resource targeting (lightweight
-# simplification). Resource effects on SEIR:
-#   ventilator -> reduces mortality among hospitalized (primary; durable/reusable)
-#   vaccine    -> moves susceptibles to immune, S->R (consumable)
-#   ppe        -> reduces effective transmission beta for the day (consumable)
-# Cooperation credit (impact/peer) is scored on the primary resource only, so the
-# cooperation mechanism is identical to the single-resource study.
 n_cities: 4
 max_days: 180
 transit_days: 1
 
-# Per-capita weekly central-reserve inflow. Shared default applies to every resource;
-# override per resource via resource_supply_per_capita if desired.
 weekly_supply_per_capita: 5.0e-5
 resources: [ventilator, vaccine, ppe]
 resource_supply_per_capita: {}
@@ -23,11 +11,9 @@ unmet_reward_weight: 0.01
 reward_scale: 1.0e-3
 targeting_reward_weight: 0.0
 
-# Working cooperation incentive (see env_default.yaml). Scored on ventilator shortfall.
 impact_reward_weight: 1.0
 rich_observations: true
 
-# No transit losses by default (see configs for the heuristic-breaks regime).
 transfer_cost_frac: 0.0
 
 initial_infected_per_city: 50
