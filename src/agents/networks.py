@@ -40,7 +40,7 @@ def _mlp(input_dim: int, hidden: int, output_dim: int) -> nn.Sequential:
 @dataclass
 class ActorOutput:
     allocation_dist: Dirichlet
-    token_dist: Beta | None     # None unless the actor was built with has_token_head=True
+    token_dist: Beta | None
 
 
 class Actor(nn.Module):
@@ -60,11 +60,6 @@ class Actor(nn.Module):
         self.action_dim = action_dim
         self.has_token_head = has_token_head
         self.input_dim = obs_dim + n_agents
-        # Additive prior on the agent's own allocation slot (index == agent id, since
-        # action_dim == n_agents here: slot i is "use locally", slots j!=i are transfers).
-        # Without it the Dirichlet inits near-uniform, so agents blindly transfer ~(n-1)/n of
-        # their stockpile every step (milestone: 9M transfers, deaths worse than the heuristic).
-        # It only shifts the init; alloc_head can learn negative logits to transfer more.
         self.local_init_bias = local_init_bias if action_dim == n_agents else 0.0
 
         self.trunk = nn.Sequential(
@@ -86,8 +81,6 @@ class Actor(nn.Module):
         if self.local_init_bias != 0.0:
             local = F.one_hot(agent_id, num_classes=self.action_dim).float()
             logits = logits + self.local_init_bias * local
-        # +1 shifts concentration above 1, keeping the distribution well-behaved near uniform
-        # at init (avoids collapsing to a corner of the simplex with infinite log-prob spikes).
         alpha = F.softplus(logits) + 1.0
         alloc = Dirichlet(alpha)
         token = None

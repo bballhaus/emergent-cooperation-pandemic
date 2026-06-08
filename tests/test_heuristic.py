@@ -19,7 +19,7 @@ def _run(policy_cls, seed=0):
 
 def test_proportional_makes_transfers():
     m = _run(ProportionalToNeedPolicy)
-    assert m.transfers_sent_total >= 0  # may be zero if no surplus; check it runs
+    assert m.transfers_sent_total >= 0
 
 
 def test_selfish_makes_no_transfers():

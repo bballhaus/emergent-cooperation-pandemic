@@ -23,15 +23,15 @@ import numpy as np
 
 @dataclass
 class SEIRParams:
-    beta: float = 0.30          # transmission rate (per day); R0 = beta / gamma
-    sigma: float = 1.0 / 4.0    # E -> I rate (1 / latent period; ~4 days for COVID-19)
-    gamma: float = 1.0 / 8.0    # I -> (R or H) rate (1 / infectious period; ~8 days)
-    hosp_frac: float = 0.025    # fraction of infections requiring critical care (~2.5%)
-    gamma_h: float = 1.0 / 14.0 # H -> (R or D) rate (1 / average ICU stay; ~14 days)
-    mu_no_vent: float = 0.90 / 14.0  # daily death rate in H without ventilator
-    mu_vent: float = 0.40 / 14.0     # daily death rate in H with ventilator
-    vaccine_efficacy: float = 0.9    # fraction of administered doses that immunize (S -> R)
-    ppe_max_reduction: float = 0.5   # max multiplicative reduction of beta at full PPE coverage
+    beta: float = 0.30
+    sigma: float = 1.0 / 4.0
+    gamma: float = 1.0 / 8.0
+    hosp_frac: float = 0.025
+    gamma_h: float = 1.0 / 14.0
+    mu_no_vent: float = 0.90 / 14.0
+    mu_vent: float = 0.40 / 14.0
+    vaccine_efficacy: float = 0.9
+    ppe_max_reduction: float = 0.5
 
 
 @dataclass
@@ -80,20 +80,18 @@ def step_seir(
     """
     S, E, I, H, R, D = state.S, state.E, state.I, state.H, state.R, state.D
 
-    # Vaccination: doses move susceptibles to recovered/immune before mixing this day.
     vaccinated = min(max(vaccines_used, 0.0) * params.vaccine_efficacy, S)
     S -= vaccinated
     R += vaccinated
 
-    N_alive = S + E + I + H + R  # exclude dead from mixing pool
+    N_alive = S + E + I + H + R
 
-    # PPE: coverage relative to the infectious pool reduces effective transmission.
     ppe_coverage = min(max(ppe_used, 0.0) / max(I, 1e-9), 1.0)
     ppe_factor = 1.0 - params.ppe_max_reduction * ppe_coverage
 
     beta = params.beta * beta_multiplier * ppe_factor
     new_infections = beta * S * I / max(N_alive, 1.0)
-    new_infections = min(new_infections, S)  # cannot exceed susceptible pool
+    new_infections = min(new_infections, S)
 
     new_infectious = params.sigma * E
     leaving_I = params.gamma * I

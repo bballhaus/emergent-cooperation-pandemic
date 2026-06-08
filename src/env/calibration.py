@@ -26,21 +26,17 @@ from .city import CityConfig
 from .seir import SEIRParams
 
 
-# Literature-derived SEIR parameters for the COVID-19 ancestral strain (R0 ≈ 2.4).
-# See: Li et al. 2020 (NEJM), Verity et al. 2020 (Lancet ID), Salje et al. 2020 (Science).
 COVID_DEFAULT = SEIRParams(
-    beta=0.30,          # R0 = 2.4 with gamma = 1/8
-    sigma=1.0 / 4.0,    # 4-day latent period
-    gamma=1.0 / 8.0,    # 8-day infectious period
-    hosp_frac=0.025,    # ~2.5% of infections require critical care
-    gamma_h=1.0 / 14.0, # 14-day average ICU stay
+    beta=0.30,
+    sigma=1.0 / 4.0,
+    gamma=1.0 / 8.0,
+    hosp_frac=0.025,
+    gamma_h=1.0 / 14.0,
     mu_no_vent=0.90 / 14.0,
     mu_vent=0.40 / 14.0,
 )
 
 
-# (name, population, staffed_adult_icu_beds). Eight largest U.S. cities + spillover states
-# are reasonable defaults; calibration_lookup() returns a subset of size N.
 CITY_TABLE: list[tuple[str, int, int]] = [
     ("New York",    8_336_817, 2200),
     ("Los Angeles", 3_898_747, 1800),
@@ -53,12 +49,6 @@ CITY_TABLE: list[tuple[str, int, int]] = [
 ]
 
 
-# Per-city ancestral-strain transmission rate (beta). The national literature default is
-# 0.30 (R0 ≈ 2.4); these encode documented early-2020 heterogeneity — dense coastal metros
-# (NYC, Chicago, Philadelphia) ran hotter than lower-density sunbelt cities (Phoenix, San
-# Antonio, San Diego). They are *literature-informed defaults*: running the CDC fit pipeline
-# (scripts/fetch_cdc_data.py → scripts/fit_city_betas.py) writes per-state fits to
-# data/processed/city_betas.json, which overrides these per city when present.
 CITY_BETA_DEFAULT: dict[str, float] = {
     "New York":     0.36,
     "Los Angeles":  0.30,
@@ -70,7 +60,6 @@ CITY_BETA_DEFAULT: dict[str, float] = {
     "San Diego":    0.28,
 }
 
-# Output of scripts/fit_city_betas.py (empty until the CDC fetch+fit has been run).
 CALIBRATED_BETA_PATH = (
     Path(__file__).resolve().parent.parent.parent / "data" / "processed" / "city_betas.json"
 )

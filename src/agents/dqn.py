@@ -42,7 +42,7 @@ class DQNConfig:
     epsilon_start: float = 1.0
     epsilon_end: float = 0.05
     epsilon_decay_episodes: int = 100
-    target_update_every: int = 500   # in env steps
+    target_update_every: int = 500
     hidden: int = 128
     seed: int = 0
     log_every: int = 10
@@ -170,7 +170,7 @@ class DQNTrainer:
                 if self.env.agents:
                     next_obs_np = np.stack([next_obs_dict[a] for a in self.env.agents])
                 else:
-                    next_obs_np = obs_np  # terminal — bootstrap zeroed by (1-done)
+                    next_obs_np = obs_np
                 for i, a in enumerate(agents_before):
                     self.buffer.push((
                         obs_np[i].copy(),

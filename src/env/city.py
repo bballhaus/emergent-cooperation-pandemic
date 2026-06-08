@@ -5,9 +5,6 @@ from typing import Optional
 
 from .seir import SEIRParams, CompartmentState
 
-# The primary transferable resource. Impact/peer cooperation credit is scored on this
-# resource only (its shortfall = H - on-hand), so the cooperation mechanism is unchanged
-# from the single-resource study; vaccines/PPE are shared but not specially shaped.
 PRIMARY_RESOURCE = "ventilator"
 
 
@@ -15,21 +12,21 @@ PRIMARY_RESOURCE = "ventilator"
 class CityConfig:
     name: str
     population: int
-    hospital_capacity: int           # baseline ventilator-capable beds (used only for obs scaling)
+    hospital_capacity: int
     seir_params: SEIRParams = field(default_factory=SEIRParams)
     initial_infected: int = 10
-    initial_stockpile: int = 0       # ventilators on hand at t=0
-    shock_start_day: int = 0         # day a demand surge begins
-    shock_duration: int = 30         # days the surge lasts
-    shock_magnitude: float = 2.0     # multiplier on beta during surge
+    initial_stockpile: int = 0
+    shock_start_day: int = 0
+    shock_duration: int = 30
+    shock_magnitude: float = 2.0
 
 
 @dataclass
 class IncomingTransfer:
-    resource: str         # one of the env's resources (e.g. "ventilator", "vaccine", "ppe")
+    resource: str
     amount: int
     arrives_on_day: int
-    sender_id: int        # index of the sending city (for peer-incentive bookkeeping)
+    sender_id: int
 
 
 @dataclass
@@ -42,10 +39,8 @@ class City:
 
     cumulative_deaths: float = 0.0
     cumulative_unmet_vent_days: float = 0.0
-    cumulative_sent: int = 0          # total units sent across all resources (cooperation volume)
-    cumulative_received: int = 0      # total units received across all resources
-    # transfers_received_this_step[sender_id] = PRIMARY-resource units delivered this step
-    # (cleared each step). Scoped to the primary resource so impact/peer credit is unchanged.
+    cumulative_sent: int = 0
+    cumulative_received: int = 0
     transfers_received_this_step: dict[int, int] = field(default_factory=dict)
 
     @classmethod
@@ -58,7 +53,6 @@ class City:
             stockpiles={r: (cfg.initial_stockpile if r == PRIMARY_RESOURCE else 0) for r in resources},
         )
 
-    # Backward-compatible scalar view of the primary-resource stockpile.
     @property
     def stockpile(self) -> int:
         return self.stockpiles.get(PRIMARY_RESOURCE, 0)

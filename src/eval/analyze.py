@@ -23,7 +23,6 @@ import numpy as np
 import pandas as pd
 
 
-# Matches: <algo>_<key>=<val>_seed<n>  OR  <algo>_seed<n>
 DIR_RE = re.compile(
     r"^(?P<algo>[a-zA-Z_]+?)(?:_(?P<key>[a-zA-Z_]+)=(?P<val>[^_]+))?_seed(?P<seed>\d+)$"
 )
@@ -69,7 +68,6 @@ def aggregate(root: Path, last_n: int = 10) -> pd.DataFrame:
         for col, values in metric_dict.items():
             arr = np.array(values, dtype=np.float64)
             mean = float(arr.mean())
-            # 95% CI using t-dist would need scipy; use normal approx (1.96 SE) for n>=3.
             se = float(arr.std(ddof=1) / np.sqrt(len(arr))) if len(arr) > 1 else 0.0
             row[f"{col}_mean"] = mean
             row[f"{col}_ci95"] = 1.96 * se
@@ -90,7 +88,7 @@ def peer_token_summary(root: Path, last_n: int = 10) -> pd.DataFrame:
     """
     emit_re = re.compile(r"^tokens_emitted_city(\d+)$")
     recv_re = re.compile(r"^tokens_received_city(\d+)$")
-    cells: dict = defaultdict(lambda: defaultdict(list))  # (sweep, city) -> {"emitted":[], "received":[]}
+    cells: dict = defaultdict(lambda: defaultdict(list))
 
     for algo, key, val, seed, csv in parse_run_dirs(root):
         if "peer" not in algo:
@@ -178,7 +176,6 @@ def main() -> int:
     if args.plot:
         plot_metric(args.root, df, args.plot, args.root / f"plot_{args.plot}.png")
 
-    # Peer-incentive per-city token-flow diagnosis (only if peer runs logged token columns).
     tokens = peer_token_summary(args.root, last_n=args.last_n)
     if not tokens.empty:
         tok_out = args.root / "peer_token_flows.csv"
@@ -187,7 +184,7 @@ def main() -> int:
         print(f"Wrote {tok_out}")
         try:
             plot_peer_tokens(tokens, args.root / "peer_token_flows.png")
-        except Exception as e:  # plotting is optional; don't fail aggregation on a headless box
+        except Exception as e:
             print(f"(skipped peer token plot: {e})")
     return 0
 

@@ -26,7 +26,6 @@ import os
 import sys
 from pathlib import Path
 
-# Allow running from repo root without installing as a package.
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
@@ -108,8 +107,6 @@ def main() -> int:
 
     out_path = Path(os.environ.get("OUT_PATH", str(REPO / "runs" / "heuristic_baseline.json")))
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    # Merge into any existing baselines so the scarcity-pass and city-count-pass can be run
-    # separately and accumulate into one file keyed by sweep label.
     merged: dict[str, dict] = {}
     if out_path.exists():
         try:

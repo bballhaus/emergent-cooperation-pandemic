@@ -18,11 +18,11 @@ class IPPOTrainer(PPOBase):
     has_token_head = False
 
     def _critic_input_dim(self) -> int:
-        return self.obs_dim + self.n_agents  # own obs + agent ID one-hot
+        return self.obs_dim + self.n_agents
 
     def _critic_input(self, obs: torch.Tensor, agent_ids: torch.Tensor, global_state: torch.Tensor) -> torch.Tensor:
         one_hot = F.one_hot(agent_ids, num_classes=self.n_agents).float()
         return torch.cat([obs, one_hot], dim=-1)
 
     def _reward_transform(self, rewards):
-        return rewards  # selfish: each agent gets only its own reward
+        return rewards

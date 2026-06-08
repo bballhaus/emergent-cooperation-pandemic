@@ -19,7 +19,7 @@ from ..env.pandemic_env import PandemicEnv
 
 @dataclass
 class EpisodeMetrics:
-    welfare: float = 0.0                # negative-of-(deaths + scaled unmet vent-days)
+    welfare: float = 0.0
     total_deaths: float = 0.0
     total_unmet_vent_days: float = 0.0
     per_city_deaths: list[float] = field(default_factory=list)

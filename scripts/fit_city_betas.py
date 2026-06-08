@@ -37,7 +37,6 @@ def main() -> int:
             print(f"  {name}: no data for state={state}, using default beta={COVID_DEFAULT.beta}")
             fits[name] = COVID_DEFAULT.beta
             continue
-        # Use the first 90 days of post-Mar-2020 data to fit the ancestral-strain beta.
         window = cases[:90]
         beta = fit_beta_from_cases(window, population=pop, initial_infected=10)
         print(f"  {name}: fitted beta = {beta:.3f}")

@@ -25,28 +25,21 @@ from .buffer import RolloutBuffer
 
 @dataclass
 class PPOConfig:
-    rollout_len: int = 180          # one full episode per rollout (default episode length)
-    total_iterations: int = 200     # 200 * 180 steps = 36k env steps per agent
+    rollout_len: int = 180
+    total_iterations: int = 200
     n_epochs: int = 5
     n_minibatches: int = 4
     clip_ratio: float = 0.2
     value_clip: float = 0.2
     vf_coef: float = 0.5
-    # Advantages are normalized to unit std, so the policy-loss gradient is ~O(1) regardless
-    # of reward scale; a 0.01 entropy bonus on a Dirichlet (entropy ~ -2) then dominates and
-    # the policy never leaves near-uniform (milestone diagnosis: "exploration bonus dominates").
-    # Start lower and anneal to zero so late training is reward-driven.
     ent_coef: float = 0.002
     ent_coef_final: float = 0.0
     gamma: float = 0.99
     gae_lambda: float = 0.95
-    # 3e-4 (the usual PPO default) overshoots here: training drifts into a degenerate
-    # high-transfer mode and deaths/unmet blow up after ~500 iters. 5e-5 is stable and keeps
-    # improving monotonically through 2000 iters in this env.
     lr: float = 5e-5
     max_grad_norm: float = 0.5
     hidden: int = 128
-    local_init_bias: float = 6.0  # init Dirichlet prior toward keeping stockpile local; see Actor
+    local_init_bias: float = 6.0
     seed: int = 0
     log_every: int = 10
     device: str = "cpu"
@@ -127,7 +120,6 @@ class PPOBase:
             header += "," + ",".join(extra_cols)
         self._csv.write(header + "\n")
 
-    # --- subclass hooks ---
     def _extra_csv_columns(self) -> list[str]:
         """Extra metrics.csv columns (e.g. peer-incentive token stats). Base logs none."""
         return []
@@ -146,7 +138,6 @@ class PPOBase:
         """Map raw per-agent rewards (shape (N,)) → per-agent training rewards (shape (N,))."""
         raise NotImplementedError
 
-    # --- rollout ---
     def _act(self, obs_np: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
         """Sample actions for all agents from current policy. Returns (actions, logp, value, extras)."""
         obs = torch.from_numpy(obs_np).float().to(self.device)
@@ -171,7 +162,7 @@ class PPOBase:
     def collect_rollout(self, buffer: RolloutBuffer) -> dict:
         """Run one episode and fill `buffer`. Returns episode-summary stats."""
         from ..eval.metrics import summarize_episode
-        obs_dict, _ = self.env.reset(seed=self.config.seed + buffer.ptr)  # vary seed per rollout
+        obs_dict, _ = self.env.reset(seed=self.config.seed + buffer.ptr)
         buffer.reset()
         for t in range(self.config.rollout_len):
             obs_np = np.stack([obs_dict[a] for a in self.env.agents])
@@ -198,7 +189,6 @@ class PPOBase:
             if not self.env.agents:
                 break
 
-        # Bootstrap value at end of rollout.
         if self.env.agents:
             obs_np = np.stack([obs_dict[a] for a in self.env.agents])
             obs_t = torch.from_numpy(obs_np).float().to(self.device)
@@ -226,12 +216,9 @@ class PPOBase:
         """Hook for peer-incentive trainer; base trainers just apply _reward_transform."""
         return self._reward_transform(r_raw)
 
-    # --- update ---
     def update(self, buffer: RolloutBuffer) -> dict:
         cfg = self.config
-        # Update value normalization with current returns.
         self.value_norm.update(buffer.returns.reshape(-1))
-        # Normalize advantages.
         adv = buffer.advantages
         adv = (adv - adv.mean()) / (adv.std() + 1e-8)
         buffer.advantages = adv
@@ -248,10 +235,6 @@ class PPOBase:
                 policy_loss = -torch.min(surr1, surr2).mean()
                 entropy = out.allocation_dist.entropy().mean()
 
-                # Token head shares the same advantage signal as the allocation head; both
-                # decisions are made jointly at each step. This is the simplest credit
-                # assignment that works — alternatives (separate value head per action
-                # component) didn't show enough gain in pilot runs to justify the complexity.
                 if self.has_token_head and out.token_dist is not None and "token_fracs" in batch:
                     new_logp_tok = out.token_dist.log_prob(batch["token_fracs"].clamp(1e-6, 1 - 1e-6))
                     ratio_tok = torch.exp(new_logp_tok - batch["logp_token_old"])
@@ -289,7 +272,6 @@ class PPOBase:
             stats[k] /= max(n_batches, 1)
         return stats
 
-    # --- main loop ---
     def train(self) -> None:
         cfg = self.config
         buffer = RolloutBuffer(
@@ -303,7 +285,6 @@ class PPOBase:
         )
         t0 = time.time()
         for it in range(1, cfg.total_iterations + 1):
-            # Linearly anneal the entropy bonus from ent_coef -> ent_coef_final over training.
             frac = (it - 1) / max(cfg.total_iterations - 1, 1)
             self._ent_coef_now = cfg.ent_coef + frac * (cfg.ent_coef_final - cfg.ent_coef)
 
@@ -333,7 +314,6 @@ class PPOBase:
                 )
         self._csv.close()
 
-        # Save final checkpoints.
         ckpt = self.log_dir / "checkpoint.pt"
         torch.save({
             "actor": self.actor.state_dict(),

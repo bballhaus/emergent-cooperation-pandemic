@@ -16,7 +16,7 @@ def test_population_conserved_over_time():
 
 def test_compartments_nonnegative():
     state = CompartmentState.initial(500_000, initial_infected=50)
-    params = SEIRParams(beta=0.6)  # high R0
+    params = SEIRParams(beta=0.6)
     for _ in range(180):
         state, _ = step_seir(state, params, ventilators_used=0.0)
         for v in [state.S, state.E, state.I, state.H, state.R, state.D]:

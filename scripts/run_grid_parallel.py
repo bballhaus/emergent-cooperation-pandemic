@@ -32,7 +32,7 @@ SCARCITIES = ["1.0e-5", "2.5e-5", "5.0e-5", "1.0e-4", "2.5e-4"]
 N_CITIES = ["2", "6", "8"]
 BASE_SCARCITY = "5.0e-5"
 BASE_NCITIES = "4"
-EXPECTED_ROWS = ITERATIONS + 1  # header + one row per iteration/episode
+EXPECTED_ROWS = ITERATIONS + 1
 
 TMP = Path("/tmp/cs224r_grid_configs")
 

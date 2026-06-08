@@ -24,8 +24,8 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 
 ITERATIONS = 1500
-SEEDS = [0, 1, 2]  # 3 seeds (trimmed for compute); default-rate point reuses 5 main seeds
-RATES = ["1.0e-3", "2.5e-3", "1.0e-2", "2.5e-2"]  # excludes default 5.0e-3
+SEEDS = [0, 1, 2]
+RATES = ["1.0e-3", "2.5e-3", "1.0e-2", "2.5e-2"]
 CONFIG = "env_multiresource.yaml"
 EXPECTED_ROWS = ITERATIONS + 1
 
@@ -67,8 +67,6 @@ def main() -> int:
 
     runs_dir = REPO / args.runs_dir
     jobs = []
-    # Dir name uses the analyze.py "<algo>_<key>=<val>_seed<n>" convention so the standard
-    # aggregator parses the sweep without changes (val must contain no underscore).
     for rate in RATES:
         for seed in SEEDS:
             log_dir = runs_dir / f"peer_token_exchange_rate={rate}_seed{seed}"

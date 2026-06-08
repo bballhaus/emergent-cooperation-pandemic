@@ -41,28 +41,15 @@ from .seir import SEIRParams, step_seir
 class EnvConfig:
     cities: list[CityConfig] = field(default_factory=list)
     max_days: int = 180
-    transit_days: int = 1                # delivery delay for inter-city transfers
-    weekly_supply_per_capita: float = 5e-5  # central-reserve weekly inflow per resident
-    death_reward_weight: float = 1.0     # cost of one death (in reward units)
-    unmet_reward_weight: float = 0.01    # cost per unmet ventilator-day
-    reward_scale: float = 1e-3           # global multiplier to keep PPO returns in a sane range
-    targeting_reward_weight: float = 0.0 # bonus to a sender per (ventilator x recipient need)
-                                         # when its transfer ARRIVES at a needy city. 0 = off
-                                         # (selfish baseline); >0 shapes need-targeted giving.
-    impact_reward_weight: float = 0.0    # bonus to a sender per delivered ventilator that
-                                         # fell within the recipient's shortfall (saturating
-                                         # impact credit). 0 = off; >0 rewards useful giving.
-    rich_observations: bool = True       # True => each agent sees other cities' (I/N, H/N,
-                                         # stockpile/N); False => only I/N (original obs).
-    transfer_cost_frac: float = 0.0      # fraction of each transfer lost in transit (>0 makes
-                                         # the greedy white-box heuristic's free rebalancing
-                                         # suboptimal; used by the heuristic-breaks regime).
-    # Lightweight multi-resource model. `resources` lists the transferable resources, the
-    # first of which is the primary (ventilator) that drives reward + cooperation credit.
-    # Each resource has its own per-capita weekly supply (default = the shared
-    # weekly_supply_per_capita if unset). The agent emits ONE allocation simplex that is
-    # applied to every resource's own stockpile (a deliberate lightweight simplification:
-    # no per-resource targeting).
+    transit_days: int = 1
+    weekly_supply_per_capita: float = 5e-5
+    death_reward_weight: float = 1.0
+    unmet_reward_weight: float = 0.01
+    reward_scale: float = 1e-3
+    targeting_reward_weight: float = 0.0
+    impact_reward_weight: float = 0.0
+    rich_observations: bool = True
+    transfer_cost_frac: float = 0.0
     resources: list[str] = field(default_factory=lambda: [PRIMARY_RESOURCE])
     resource_supply_per_capita: dict[str, float] = field(default_factory=dict)
 
@@ -86,17 +73,14 @@ class PandemicEnv(ParallelEnv):
         self.n_resources = len(self.resources)
         self.cities: list[City] = [City.from_config(c, self.resources) for c in config.cities]
 
-        # Per-resource weekly per-capita supply (falls back to the shared scarcity knob).
         self.resource_supply = {
             r: float(config.resource_supply_per_capita.get(r, config.weekly_supply_per_capita))
             for r in self.resources
         }
 
-        # Own block: 8 SEIR/capacity/time fields + one stockpile field per resource.
-        # Per other city: I/N (+ H/N and one stockpile field per resource when rich).
         own_dim = 8 + self.n_resources
         per_other = (2 + self.n_resources) if config.rich_observations else 1
-        self._obs_dim = own_dim + per_other * (self.n_cities - 1)  # see _observe()
+        self._obs_dim = own_dim + per_other * (self.n_cities - 1)
         self._action_dim = self.n_cities
 
         self._obs_spaces = {
@@ -110,10 +94,8 @@ class PandemicEnv(ParallelEnv):
 
         self.day: int = 0
         self._rng = np.random.default_rng()
-        # Per-step bookkeeping needed by peer-incentive wrapper / metrics.
         self.last_step_info: dict = {}
 
-    # PettingZoo API ---------------------------------------------------------
     def observation_space(self, agent: str) -> spaces.Box:
         return self._obs_spaces[agent]
 
@@ -132,16 +114,10 @@ class PandemicEnv(ParallelEnv):
         return obs, infos
 
     def step(self, actions: dict[str, np.ndarray]):
-        # 1. Deliver any transfers that arrive today (before allocation decisions use them).
-        # Snapshot pre-arrival stockpiles so impact credit can measure how many arriving
-        # ventilators actually fell within the recipient's unmet need.
         stockpile_before = [c.stockpile for c in self.cities]
         for c in self.cities:
             c.receive_arrivals(self.day)
 
-        # 1b. Targeting credit (NEGATIVE-RESULT ABLATION, off by default): a sender earns a
-        # bonus proportional to (ventilators delivered) x (recipient I/N). Rewards GROSS
-        # giving, which amplified PPO's over-transfer and was harmful — kept only as a knob.
         targeting_bonus = np.zeros(self.n_cities, dtype=np.float64)
         if self.config.targeting_reward_weight > 0.0:
             for j, recipient in enumerate(self.cities):
@@ -150,10 +126,6 @@ class PandemicEnv(ParallelEnv):
                     if 0 <= sender_id < self.n_cities:
                         targeting_bonus[sender_id] += amount * need_j
 
-        # 1c. Impact credit: a sender is rewarded only for the delivered ventilators that
-        # fall within the recipient's actual shortfall (H - stockpile it already had).
-        # min(delivered, shortfall) SATURATES once demand is met, so dumping surplus on a
-        # city earns nothing — the key difference from the gross targeting bonus above.
         impact_bonus = np.zeros(self.n_cities, dtype=np.float64)
         if self.config.impact_reward_weight > 0.0:
             for j, recipient in enumerate(self.cities):
@@ -167,18 +139,15 @@ class PandemicEnv(ParallelEnv):
                     if 0 <= sender_id < self.n_cities:
                         impact_bonus[sender_id] += useful * (amount / total_delivered)
 
-        # 2. Weekly central-reserve replenishment.
         if self.day > 0 and self.day % 7 == 0:
             self._replenish()
 
-        # 3. Interpret each agent's action as a simplex over (use_locally, transfer_to_each_other).
         allocations: list[dict] = self._apply_actions(actions)
 
-        # 4. Advance SEIR for each city using its locally-used resources.
         diagnostics_per_city: list[dict] = []
         rewards: dict[str, float] = {}
         for i, city in enumerate(self.cities):
-            locals_i = allocations[i]["local"]  # resource name -> units used locally
+            locals_i = allocations[i]["local"]
             new_state, diag = step_seir(
                 city.state,
                 city.config.seir_params,
@@ -203,7 +172,6 @@ class PandemicEnv(ParallelEnv):
             ) * self.config.reward_scale
             rewards[self.agents[i]] = float(r)
 
-        # 5. Advance time, build outputs.
         self.day += 1
         terminated_flag = self.day >= self.config.max_days
         terminations = {a: terminated_flag for a in self.agents}
@@ -230,12 +198,11 @@ class PandemicEnv(ParallelEnv):
         return obs, rewards, terminations, truncations, infos
 
     def render(self) -> None:
-        pass  # text/plot renderer can be added if needed for debugging
+        pass
 
     def close(self) -> None:
         pass
 
-    # Helpers used by MAPPO critic and metrics --------------------------------
     def global_state(self) -> np.ndarray:
         """Concatenated city observations + day signal; centralized MAPPO critic input."""
         parts = [self._observe(i) for i in range(self.n_cities)]
@@ -244,7 +211,6 @@ class PandemicEnv(ParallelEnv):
     def global_state_dim(self) -> int:
         return self._obs_dim * self.n_cities
 
-    # Internals ---------------------------------------------------------------
     def _observe(self, i: int) -> np.ndarray:
         c = self.cities[i]
         N = max(c.config.population, 1)
@@ -262,11 +228,6 @@ class PandemicEnv(ParallelEnv):
             ],
             dtype=np.float32,
         )
-        # Public need/supply signal for every other city. With rich_observations, expose
-        # infection rate (I/N), hospitalized load (H/N, the ventilator-demand proxy), and
-        # stockpile (S_v/N, their on-hand supply) — so an agent can compute net need
-        # (demand minus supply), the signal the proportional-to-need heuristic exploits.
-        # Otherwise expose only I/N (the original observation) for the ablation.
         others = []
         for j in range(self.n_cities):
             if j == i:
@@ -303,15 +264,14 @@ class PandemicEnv(ParallelEnv):
             sent_total = 0
             for resource in self.resources:
                 stockpile = self.cities[i].stockpiles[resource]
-                # Integer floor on each slot, then push leftovers into the local-use bucket.
                 raw = simplex * stockpile
                 counts = np.floor(raw).astype(np.int64)
-                counts[i] += stockpile - int(counts.sum())  # leftover to local
+                counts[i] += stockpile - int(counts.sum())
 
                 for j in range(self.n_cities):
                     if j == i or counts[j] <= 0:
                         continue
-                    shipped = int(np.floor(counts[j] * keep))  # transit losses (cost regime)
+                    shipped = int(np.floor(counts[j] * keep))
                     sent = self.cities[i].send(
                         amount=shipped,
                         recipient=self.cities[j],
@@ -320,18 +280,14 @@ class PandemicEnv(ParallelEnv):
                         day=self.day,
                         resource=resource,
                     )
-                    # Deduct the full dispatched amount; the lost fraction never arrives.
                     lost = int(counts[j]) - shipped
                     if lost > 0:
                         self.cities[i].stockpiles[resource] = max(
                             self.cities[i].stockpiles[resource] - lost, 0
                         )
                     sent_total += sent
-                # Local use caps at what remains after sends.
                 local_use = min(int(counts[i]), self.cities[i].stockpiles[resource])
                 local_by_resource[resource] = local_use
-                # Ventilators are durable (reused day to day, stockpile rolls forward);
-                # vaccines/PPE are consumed when administered, so deplete their stock.
                 if resource != PRIMARY_RESOURCE:
                     self.cities[i].stockpiles[resource] -= local_use
             allocations.append({"local": local_by_resource, "sent_total": sent_total})
@@ -349,7 +305,6 @@ class PandemicEnv(ParallelEnv):
             total_weekly = int(round(total_pop * self.resource_supply[resource] * 7))
             if total_weekly <= 0:
                 continue
-            # Proportional to population, with integer remainder going to the largest city.
             raw = shares * total_weekly
             ints = np.floor(raw).astype(np.int64)
             ints[largest] += total_weekly - int(ints.sum())

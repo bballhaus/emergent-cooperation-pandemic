@@ -26,7 +26,6 @@ class ProportionalToNeedPolicy:
         env = self.env
         n = env.n_cities
         actions: dict[str, np.ndarray] = {}
-        # Others' I/N as proxy for unmet need.
         infect_rates = np.array(
             [env.cities[j].state.I / max(env.cities[j].config.population, 1) for j in range(n)],
             dtype=np.float64,
@@ -46,7 +45,7 @@ class ProportionalToNeedPolicy:
                 other_shares = remaining * other_rates / total_other
             else:
                 other_shares = np.zeros(n)
-                own_share = 1.0  # nobody else needs it; keep everything local
+                own_share = 1.0
 
             a = other_shares
             a[i] = own_share

@@ -31,11 +31,7 @@ from ..train.ppo_base import PPOConfig
 
 @dataclass
 class PeerIncentiveConfig(PPOConfig):
-    token_budget: int = 100        # per-agent tokens available per episode
-    # Reward bonus per token, already in the env's (scaled) reward units. At 1e-4 the bonus
-    # was both ~1000x too small (double reward_scale bug, now removed) and negligible vs a
-    # per-step reward of order ~1 during a surge, so donating never paid off. Raised so a full
-    # token budget (~0.5 reward) can offset the marginal cost of giving up ventilators.
+    token_budget: int = 100
     token_exchange_rate: float = 5e-3
     log_token_stats_every: int = 10
 
@@ -47,16 +43,9 @@ class PeerIncentiveTrainer(IPPOTrainer):
     def __init__(self, env, config: PeerIncentiveConfig):
         super().__init__(env, config)
         self.pi_cfg: PeerIncentiveConfig = config
-        # Tracking across an episode.
         self._budget: np.ndarray = np.full(self.n_agents, self.pi_cfg.token_budget, dtype=np.int64)
-        # token_to_transfer_ratio: cumulative tokens emitted / cumulative ventilators received,
-        # tracked across the whole training run to monitor for collusion (ratio drifting up
-        # without matching welfare gains => agents are inflating tokens, not actually sharing).
         self._cum_tokens_emitted = 0
         self._cum_transfers_received = 0
-        # Per-episode per-city token flows, for the equity diagnosis: who acknowledges (emits)
-        # vs who gets rewarded (donates). Under staggered shocks we expect pre-surge cities to
-        # be net donors and get most tokens, which is what drives peer's rising Gini.
         self._per_city_emitted = np.zeros(self.n_agents, dtype=np.int64)
         self._per_city_received = np.zeros(self.n_agents, dtype=np.int64)
         self._reset_episode_state()
@@ -67,10 +56,8 @@ class PeerIncentiveTrainer(IPPOTrainer):
         self._per_city_received = np.zeros(self.n_agents, dtype=np.int64)
 
     def collect_rollout(self, buffer) -> dict:
-        # Hook in episode-state reset before the base class kicks off the env reset.
         self._reset_episode_state()
         ep = super().collect_rollout(buffer)
-        # Attach peer-incentive diagnostics.
         ep["tokens_emitted_cumulative"] = int(self._cum_tokens_emitted)
         ep["transfers_received_cumulative"] = int(self._cum_transfers_received)
         ratio = (
@@ -110,7 +97,6 @@ class PeerIncentiveTrainer(IPPOTrainer):
         if token_fracs is None:
             return r
 
-        # For each agent i (the potential ack-er):
         for i, agent in enumerate(agents):
             received = infos[agent].get("transfers_received", {})
             if not received:
@@ -125,8 +111,6 @@ class PeerIncentiveTrainer(IPPOTrainer):
             if tokens_to_emit <= 0:
                 continue
 
-            # Distribute proportional to sender contribution. The bonus is already in the
-            # env's scaled reward units (r_raw is scaled), so no extra reward_scale here.
             for sender_id, amount in received.items():
                 share = amount / max(total_received, 1)
                 allocated = int(round(tokens_to_emit * share))

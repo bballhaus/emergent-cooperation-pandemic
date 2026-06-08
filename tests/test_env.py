@@ -9,7 +9,6 @@ from src.env import PandemicEnv, load_env_config
 
 def _make_env(n_cities=4):
     cfg = load_env_config("env_default.yaml")
-    # Override n_cities by rebuilding via build_env_config-compatible dict.
     from src.env.config_loader import build_env_config, load_yaml
     yd = load_yaml("env_default.yaml")
     yd["n_cities"] = n_cities
@@ -61,13 +60,11 @@ def test_replenishment_happens_weekly():
     stockpiles = []
     for _ in range(15):
         actions = {a: np.zeros(env.n_cities, dtype=np.float32) for a in env.agents}
-        # Keep everything local, no transfers, to isolate replenishment effect on stockpile.
         for a in actions:
             i = env.possible_agents.index(a)
             actions[a][i] = 1.0
         env.step(actions)
         stockpiles.append(sum(c.stockpile for c in env.cities))
-    # Replenishment fires on day % 7 == 0 (i.e. starts of weeks > 0). Stockpile should jump there.
     assert stockpiles[6] > stockpiles[5] or stockpiles[7] > stockpiles[6], (
         f"Expected stockpile to grow on weekly replenishment, got {stockpiles}"
     )
@@ -76,17 +73,14 @@ def test_replenishment_happens_weekly():
 def test_transfer_arrives_after_transit_delay():
     env = _make_env(2)
     env.reset(seed=0)
-    # Manually seed stockpile so we can observe transfer dynamics.
     env.cities[0].stockpile = 100
     env.cities[1].stockpile = 0
 
-    # City 0: send 100% to city 1. City 1: keep all local (but has nothing).
     a0 = np.array([0.0, 1.0], dtype=np.float32)
     a1 = np.array([0.0, 1.0], dtype=np.float32)
-    a1[1] = 1.0; a1[0] = 0.0  # city 1 keeps local
+    a1[1] = 1.0; a1[0] = 0.0
     actions = {"city_0": a0, "city_1": a1}
     env.step(actions)
-    # transit_days=1, so city 1's stockpile rises next step's arrival phase.
     actions = {"city_0": np.array([1.0, 0.0], dtype=np.float32),
                "city_1": np.array([0.0, 1.0], dtype=np.float32)}
     env.step(actions)

@@ -93,7 +93,7 @@ class RolloutBuffer:
         flat_values = self.values.reshape(TN)
         flat_advantages = self.advantages.reshape(TN)
         flat_returns = self.returns.reshape(TN)
-        flat_global = np.repeat(self.global_state, self.N, axis=0)  # broadcast per-step global to N
+        flat_global = np.repeat(self.global_state, self.N, axis=0)
         flat_token_fracs = self.token_fracs.reshape(TN) if self.has_token else None
         flat_logp_token = self.logp_token.reshape(TN) if self.has_token else None
 
