@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Emergent Cooperation in Pandemic Resource Allocation"
+abstract: "Trains and evaluates multi-agent RL algorithms (IPPO, MAPPO, DQN, and a peer-incentive variant) on a multi-city SEIR-based pandemic simulator in which each city decides whether to transfer scarce ventilator, vaccine, and PPE stockpiles to cities in greater need."
+authors:
+  - family-names: Ballhaus
+    given-names: Brooke
+  - family-names: Narain
+    given-names: Riya
+date-released: 2026-06-08
+repository-code: "https://github.com/bballhaus/emergent-cooperation-pandemic"
+license: MIT
