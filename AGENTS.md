@@ -23,7 +23,8 @@ heuristic baseline. The narrative of experiments E0-E7 is in
 - `configs/`: environment YAMLs (`env_default.yaml` is the main config) and
   sweep YAMLs (`city_count_sweep.yaml`, `scarcity_sweep.yaml`).
 - `scripts/`: experiment drivers and data scripts (see below).
-- `tests/`: pytest tests for the env, SEIR model and heuristic.
+- `tests/`: pytest tests for the env, SEIR model, heuristic, and an
+  end-to-end smoke test.
 - `runs*/`: committed experiment outputs (see "Results").
 - `data/raw/`, `data/processed/`: gitignored except `.gitkeep`.
 
@@ -47,6 +48,14 @@ Framework is pytest (`tests/conftest.py` adds the repo root to `sys.path`).
 python -m pytest tests/
 python -m pytest tests/test_seir.py   # one file
 ```
+
+`tests/test_smoke.py` is an end-to-end smoke test (builds the env from
+`env_default.yaml`, steps it with random and heuristic actions, and trains IPPO
+for 2 iterations into pytest's `tmp_path`). The whole suite runs on CPU in
+about 10 seconds with no network or committed results.
+
+CI: `.github/workflows/tests.yml` runs `python -m pytest -q` on Python 3.11
+(CPU torch) for pushes and pull requests to `main`.
 
 ## Running experiments
 
@@ -76,7 +85,8 @@ Full sweeps (expensive: 1500 iterations x 4 algos x 5 seeds and more):
   `runs/` and then rewrites `runs/aggregated.csv`.
 - `python scripts/run_grid_parallel.py` - parallel, resumable grid. Flags:
   `--workers`, `--base-config`, `--runs-dir`, `--algos`, `--default-only`,
-  `--skip-city-sweep`. (The README shows a `--config` flag; it does not exist.)
+  `--skip-city-sweep`. By default it runs both the scarcity and city-count
+  sweeps.
 - `python scripts/run_heuristic_baseline.py` - writes
   `runs/heuristic_baseline.json` (override with `OUT_PATH`, `SEEDS` env vars).
 - `python scripts/run_exchange_rate_sweep.py` - peer exchange-rate sweep on

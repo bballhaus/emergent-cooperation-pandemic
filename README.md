@@ -101,7 +101,7 @@ bash scripts/run_all_experiments.sh
 python scripts/run_heuristic_baseline.py
 
 # City-count or scarcity sweeps in parallel
-python scripts/run_grid_parallel.py --config configs/city_count_sweep.yaml
+python scripts/run_grid_parallel.py --base-config env_default.yaml --workers 8
 
 # Exchange-rate sweep (E6)
 python scripts/run_exchange_rate_sweep.py
